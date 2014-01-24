@@ -10,7 +10,7 @@ And, if the SoS keeps track of errors reported in the data, they do not let anyo
 
 So, if someone says they live in "Oatland, CA", or say they have a 2 digit phone number, there is nothing the SoS can do about it.
 
-But we, as members of the public, can see this data and I can set up a system to track errors I have found in the data and ways to correct them. I have no authorization to correct the data, but when I have the data, it is no longer a legal record of the data, but my copy of the legal record, to do with as I will. So, I will. And I will not claim that this data is the legal record, so that is all good.
+But we, as members of the public, can see this data and I can set up a system to track errors in the data and keep track of how to correct the errors. I have no authorization to correct the data, but when I have the data, it is no longer a legal record of the data, but my copy of the legal record, to do with as I will. So, I will. And I will not claim that this data is the legal record, so that is all good.
 
 If you have any suggestions about any of this, please contact me at:
 
