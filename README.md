@@ -2,7 +2,7 @@ The California Secretary of State makes a raw dump of data about campaign financ
 
 http://www.sos.ca.gov/prd/cal-access/
 
-The zip file at http://campaignfinance.cdn.sos.ca.gov/dbwebexport.zip contains two zip files, one with a "doc_" prefix and the other with a "db_" prefix. The doc file has not changed since I have been tracking this (2013/10/28). The db file changes every day, but I am not sure what time it gets updated, if there is a regular time. The SoS also does not publish a digest value, so one cannot verify the integrity of the download, or timestamp the file in any visible way. And the SoS offically provides no support for anything done with this data.
+The zip file at http://campaignfinance.cdn.sos.ca.gov/dbwebexport.zip contains two zip files, one with a "doc_" prefix and the other with a "db_" prefix. The doc file was changed between 2013/10-28 and 2013/12/12, but not then. The db file changes every day, but I am not sure what time it gets updated or if there is a regular time for the update. The SoS also does not publish a digest value, so one cannot verify the integrity of the download, and it does not timestamp the file in any visible way. And the SoS offically provides no support for anything done with this data.
 
 As a matter of fact, the SoS cannot correct anything in the data. The data is filed as it is filed and is a legal document. Because the system that accepts on-line submissions does not seem to do any data validation before accepting the data, a lot of stuff has been accepted.
 
