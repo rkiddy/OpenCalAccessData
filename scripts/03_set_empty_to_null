@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+
+if ( ! -f "scripts/options.pl" ) { 
+    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
+    exit(1);
+}
+
+require "../OpenCalAccess/options.pl";
+
+$myQ = "/opt/local/bin/mysql5 -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+$myV = "/opt/local/bin/mysql5 -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+
+    if ($ARGV[$idx] !~ /^\-/) { push @tables, $ARGV[$idx]; }
+
+    if ($ARGV[$idx] eq "-all") { $allTables = 1; }
+
+    if ($ARGV[$idx] eq "-fromDate") { $fromDate = $ARGV[$idx+1]; $idx++; next; }
+}
+
+if (defined($allTables)) {
+    $cmd = "echo \"show tables;\" | ".$myQ;
+    @tables = `$cmd`;
+    chomp(@tables);
+}
+
+if (scalar(@tables) == 0) { print "\nusage: ./04_set_empty_to_null [ -fromDate YYYYMMDD ] [ -all | <tableNames> ]\n\n"; exit(0); }
+
+foreach (@tables) {
+    $table = $_;
+
+    $cmd = "echo \"desc ".$table.";\" | ".$myQ;
+    @columns = `$cmd`;
+    chomp(@columns);
+
+    open M, "| ".$myV;
+
+    foreach (@columns) {
+       $column = $_;
+       # print "column: \"".$column."\"\n";
+
+       if (($column !~ /\tint/) &&
+           ($column !~ /\tdecimal/) &&
+           ($column !~ /\tdate/)) {
+           @p = split ' ', $column;
+           $column = shift @p;
+           if ( ! defined($fromDate)) {
+               print M "update ".$table." set ".$column." = NULL where length(".$column.") = 0;\n";
+           } else {
+               $countable = $table;
+               $countable =~ s/_cd//;
+               print M "update ".$table." set ".$column." = NULL where length(".$column.") = 0 and ".
+                               "pk >= (select ".$countable." from import_dates where import_date = '".$fromDate."');\n";
+           }
+       }
+    }
+
+    close M;
+}

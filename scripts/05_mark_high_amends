@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+
+if ( ! -f "scripts/options.pl" ) { 
+    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
+    exit(1);
+}
+
+require "../OpenCalAccess/options.pl";
+
+foreach (@ARGV) {
+    if ($_ !~ /^\-/) { push @tables, $_; }
+}
+
+if ( ! defined(@tables)) {
+    open T, "tableCols.txt";
+    while (<T>) {
+        chomp;
+        $line = $_;
+        if ($last eq "") { $tName = $_; }
+        if ($line =~ /amend_id/) { push @tables, $tName; }
+        $last = $line;
+    }
+}
+
+$myV = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+$myQ = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+
+$cmd = "echo \"desc filer_filings;\" | ".$myQ;
+@cols = `$cmd`;
+
+foreach (@cols) {
+    @p = split '\t', $_;
+    if ($p[0] eq "high_amend_id") { $foundHighAmend = 1; }
+}
+
+if ( ! defined($foundHighAmend)) {
+    $cmd = "echo \"alter table filer_filings add column high_amend_id int after filing_id;\" | ".$myV;
+    print `$cmd`;
+}
+
+open M, "| ".$myV;
+
+foreach (@tables) {
+    $table = $_;
+
+    print $table."...";
+
+    print M "update filer_filings f1, (select filing_id, max(amend_id) as max from ".$table." group by filing_id) as a1 ".
+            "set f1.high_amend_id = a1.max where f1.filing_id = a1.filing_id and (f1.high_amend_id is NULL or f1.high_amend_id < a1.max);\n";
+
+    print "\n";
+}
+
+close M;
+
+print "\n\n";
+
+exit(0);

@@ -1,0 +1,197 @@
+#!/usr/bin/perl
+
+if ( ! -f "scripts/options.pl" ) {
+    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
+    exit(1);
+}
+
+if ( ! defined($ARGV[0])) { print "\nERROR: Please give me a data directory as a parameter.\n\n"; exit(1); }
+
+$d = $ARGV[0];
+
+if (( ! -f $d."/Data/RCPT_CD.TSV") || ( ! -f $d."/Data/TEXT_MEMO_CD.TSV")) {
+    print "\nERROR: Please give me a data directory as a parameter.\n\n"; exit(1);
+}
+
+$file = $d."/Data/TEXT_MEMO_CD.TSV";
+$outFile = $d."/Data/TEXT_MEMO_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+$cmd = "/usr/bin/tr '\\r' '\\n' < ".$file." | /usr/bin/grep -v \'^\$\' | /opt/local/bin/perl -p -e 's/\\n/\\r\\n/g' - > ".$outFile."\n";
+print `$cmd`;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+$file = $d."/Data/RCPT_CD.TSV";
+$outFile = $d."/Data/RCPT_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+open F1, $file;
+open F2, "> ".$outFile;
+
+while (<F1>) {
+    $line = $_;
+
+    @p = split '\t', $line;
+    if (scalar(@p) < 60) {
+        $nextLine = <F1>;
+        if ($nextLine =~ /^BER CONTENT/) {
+            chomp($line);
+            print F2 $line."U".$nextLine;
+        } else {
+            print "\nERROR: Something is wrong. Is there another error?\n\n";
+            exit(1);
+        }
+    } else {
+        print F2 $line;
+    }
+}
+
+close F1;
+close F2;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+$file = $d."/Data/EFS_FILING_LOG_CD.TSV";
+$outFile = $d."/Data/EFS_FILING_LOG_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+open F1, $file;
+open F2, "> ".$outFile;
+
+while (<F1>) {
+    $line = $_;
+
+    $line =~ s/\\\t/\t/;
+
+    print F2 $line;
+}
+
+close F1;
+close F2;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+$file = $d."/Data/FILERNAME_CD.TSV";
+$outFile = $d."/Data/FILERNAME_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+open F1, $file;
+open F2, "> ".$outFile;
+
+while (<F1>) {
+    $line = $_;
+
+    $line =~ s/\\ CHANDLER/\/ CHANDLER/;
+
+    $line =~ s/SMITH\t *\tKATHI/SMITH\tKATHI/;
+
+    $line =~ s/LOCK\\LINE/LOCK\/LINE/;
+
+    $line =~ s/\\$//;
+
+    if ($line =~ /^1310515\t/) {
+        $next = <F1>;
+        chomp($line);
+        $line =~ s/\r//g;
+        $line = $line.$next;
+    }
+
+    print F2 $line;
+}
+
+close F1;
+close F2;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+$file = $d."/Data/FILER_TO_FILER_TYPE_CD.TSV";
+$outFile = $d."/Data/FILER_TO_FILER_TYPE_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+open F1, $file;
+open F2, "> ".$outFile;
+
+while (<F1>) {
+    $line = $_;
+
+    $line =~ s/\/3000 12:/\/2000 12:/;
+    $line =~ s/\/8200 12:/\/2003 12:/;
+    $line =~ s/\/8004 12:/\/2004 12:/;
+    $line =~ s/\/2906 12:/\/2006 12:/;
+    $line =~ s/\/5005 12:/\/2005 12:/;
+    $line =~ s/\/9006 12:/\/2006 12:/;
+    $line =~ s/\/6008 12:/\/2008 12:/;
+    $line =~ s/\/2208 12:/\/2008 12:/;
+    $line =~ s/\/2030 12:/\/2009 12:/;
+    $line =~ s/\/3010 12:/\/2010 12:/;
+    $line =~ s/\/2020 12:/\/2010 12:/;
+    $line =~ s/\/8201 12:/\/2010 12:/;
+
+    print F2 $line;
+}
+
+close F1;
+close F2;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+$file = $d."/Data/LOBBYING_CHG_LOG_CD.TSV";
+$outFile = $d."/Data/LOBBYING_CHG_LOG_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+open F1, $file;
+open F2, "> ".$outFile;
+
+while (<F1>) {
+    $line = $_;
+
+    $line =~ s/EMERB\\GENCY/EMERGENCY/;
+
+    print F2 $line;
+}
+
+close F1;
+close F2;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+$file = $d."/Data/NAMES_CD.TSV";
+$outFile = $d."/Data/NAMES_CD.TSV_FIXED";
+
+print "\nfixing ".$file."...";
+
+open F1, $file;
+open F2, "> ".$outFile;
+
+while (<F1>) {
+    $line = $_;
+
+    $line =~ s/ *$//;
+    $line =~ s/^ *//;
+    $line =~ s/ *\t/\t/g;
+
+    print F2 $line;
+}
+
+close F1;
+close F2;
+
+rename $file, $file."_ORIG";
+rename $outFile, $file;
+
+print "\n\n";
+
+exit(0);

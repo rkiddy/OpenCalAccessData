@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+
+if ( ! -f "scripts/options.pl" ) { 
+    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
+    exit(1);
+}
+
+require "../OpenCalAccess/options.pl";
+
+$all = 1;
+
+foreach (@ARGV) { $tablesOnly{$_} = 1; undef $all }
+
+$myV = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv --force ".&option("dbName");
+
+open T, "tableCols.txt";
+while (<T>) {
+    chomp;
+    $line = $_;
+    if ($last eq "") { $tName = $_; }
+    if ($line =~ / date/) {
+        if (defined($all) || defined($tablesOnly{$tName})) {
+            $dateCols{$tName."|".$`} = 1;
+        }
+    }
+    $last = $line;
+}
+
+print "\n";
+
+foreach (sort keys %dateCols) {
+
+    ($table, $column) = split '\|', $_;
+
+    print "table: \"".$table."\"\n";
+    print "column: \"".$column."\"\n";
+
+    open M, "| ".$myV;
+    print M "set max_error_count = 65535;\n";
+    print M "alter table ".$table." add column ".$column."_2 date;\n";
+    print M "update ".$table." set ".$column."_2 = ".$column.";\n";
+    print M "show warnings;\n";
+    print M "alter table ".$table." drop column ".$column."_2;\n";
+    close M;
+}
+
+exit(0);

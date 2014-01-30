@@ -1,0 +1,158 @@
+#!/usr/bin/perl
+
+if ( ! -f "scripts/options.pl" ) { 
+    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
+    exit(1);
+}
+
+require "../OpenCalAccess/options.pl";
+
+for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
+
+    if ($ARGV[$idx] eq "-dryrun") { $dryrun = 1; }
+
+    if ($ARGV[$idx] eq "-v") { $verbose = 1; }
+
+    if ($ARGV[$idx] eq "-all") { $allTables = 1; }
+
+    if ($ARGV[$idx] !~ /^\-/) { $tables{$ARGV[$idx]} = 1; }
+}
+
+if ( ! defined($allTables) && (scalar(keys %tables)) == 0) {
+    print "\nusage: ./02_create_final [ -v ] [ -dryrun ] [ -all | <files> ] - please use -all or a list of tables\n\n";
+    exit(0);
+}
+
+if (defined($allTables) && (scalar(keys %tables)) > 0) {
+    print "\nusage: ./02_create_final [ -v ] [ -dryrun ] [ -all | <files> ] - do not use -all and list files on the command line\n\n";
+    exit(0);
+}
+
+open T, "tableCols.txt";
+while (<T>) {
+    chomp;
+    $line = $_;
+
+    if ($last eq "") { $tName = $line; $idx = 0; }
+    else {
+        @parts = split ' ', $line;
+        $tablesFound{$tName} = 1;
+        $columns{$tName}[$idx] = shift @parts;
+        $colTypes{$tName}[$idx] = join ' ', @parts;
+
+        # print "columns{".$tName."}[".$idx."] = \"".$columns{$tName}[$idx]."\"\n";
+        # print "colTypes{".$tName."}[".$idx."] = \"".$colTypes{$tName}[$idx]."\"\n";
+
+        $idx++;
+    }
+    $last = $line;
+}
+
+# Check for match between cd tables and regular tables.
+#
+#foreach (sort keys %tablesFound) {
+#    $table = $_;
+#    # print "table: ".$table."\n";
+#
+#    $cmd = "echo \"desc ".$table."_cd;\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+#    @rows = `$cmd`;
+#    $idx = 0;
+#    foreach (@rows) {
+#        $row = $_;
+#        @cols = split '\t', $row;
+#        $tableCheck{$table}[$idx] = $cols[0];
+#        $idx++;
+#    }
+#}
+#
+#foreach (sort keys %tablesFound) {
+#
+#    $table = $_;
+#
+#    $idx = 0;
+#    $errs = 0;
+#
+#    while (defined($columns{$table}[$idx])) {
+#        # print "columns{".$table."}[".$idx."] \"".$columns{$table}[$idx]."\" ?= tableCheck{".$table."}[".$idx."] \"".$tableCheck{$table}[$idx]."\"\n";
+#        if ($columns{$table}[$idx] ne $tableCheck{$table}[$idx]) { $errs++; }
+#        $idx++;
+#    }
+#    print "table: ".$table." errs: ".$errs."\n";
+#}
+#
+#exit(0);
+
+if (defined($allTables)) { %tables = %tablesFound; }
+
+print "\ntables count = ".(scalar(keys %tables))."\n\n";
+
+if (defined($dryrun)) {
+    open M, "| cat";
+} else {
+    open M, "| ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+}
+
+print M "set max_error_count = 65535;\n";
+
+foreach (sort keys %tables) {
+    $table = $_;
+
+    print M "drop table if exists ".$table.";\n";
+
+    undef @cols;
+
+    $idx = 0;
+    while (defined($columns{$table}[$idx])) {
+        $type = $colTypes{$table}[$idx];
+        if ($type eq "date" || $type eq "datetime") { $type = "varchar(100)"; }
+        push @cols, "    ".$columns{$table}[$idx]." ".$type;
+        $idx++;
+    }
+
+    $sql = "create table ".$table." (\n";
+    $sql .= join ",\n", @cols;
+    $sql .= "\n);\n";
+
+    print M $sql;
+
+    if (defined($verbose)) { print M "show warnings;\n"; }
+
+    $idx = 0;
+    while (defined($columns{$table}[$idx])) {
+        if ($colTypes{$table}[$idx] eq "date") {
+            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(10));\n";
+        }
+        if ($colTypes{$table}[$idx] eq "datetime") {
+            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
+        }
+        if ($columns{$table}[$idx] eq "filing_id") {
+            print M "alter table ".$table." add index(filing_id);\n";
+        }
+        if ($columns{$table}[$idx] eq "amend_id") {
+            print M "alter table ".$table." add index(amend_id);\n";
+        }
+        if ($columns{$table}[$idx] eq "filer_id") {
+            print M "alter table ".$table." add index(filer_id);\n";
+        }
+        $idx++;
+    }
+
+    undef @cols;
+
+    $idx = 0;
+    while (defined($columns{$table}[$idx])) {
+        push @cols, "    ".$columns{$table}[$idx];
+        $idx++;
+    }
+
+    print M "insert into ".$table." (\n";
+    print M (join ",\n", @cols)."\n";
+    print M ") select \n";
+    print M (join ",\n", @cols)."\n";
+    print M "from ".$table."_cd;\n";
+}
+
+close M;
+
+exit(0);
+

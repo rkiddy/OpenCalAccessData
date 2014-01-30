@@ -1,0 +1,183 @@
+#!/usr/bin/perl
+
+if ( ! -f "scripts/options.pl" ) { 
+    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
+    exit(1);
+}
+
+require "../OpenCalAccess/options.pl";
+
+if (scalar(@ARGV) == 0) { print "\nusage: ./05_fix_dates [ -dryrun ] [ -all ] [ -no_create ] [ <files> ]\n\n"; exit(0); }
+
+@sql = split '\n', $sql;
+
+foreach (@ARGV) {
+    $arg = $_;
+
+    if ($arg eq "-all") { $allTables = 1; }
+
+    if ($arg eq "-dryrun") { $dryrun = 1; }
+
+    if ($arg !~ /^\-/) { $tables{$arg} = 1; }
+}
+
+open T, "tableCols.txt";
+while (<T>) {
+    chomp;
+    $line = $_;
+
+    if ($last eq "" && $line ne "") {
+        $tableName = $line;
+
+        $sql = "show index from ".$tableName.";";
+        $cmd = "echo \"".$sql."\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+        foreach (`$cmd`) {
+            $row = $_;
+            @p = split '\t', $row;
+            $indexes{$tableName}{$p[4]} = 1;
+        }
+    }
+
+    if ($line =~ / date$/) { 
+
+        $column = $line;
+        $column =~ s/ date$//;
+
+        if (defined($allTables) || defined($tables{$tableName})) {
+
+            print "fix date: table: \"".$tableName."\", column: \"".$column."\"\n";
+
+            if ( ! defined($indexes{$tableName})) {
+                $sql = "show index from cvr_campaign_disclosure;";
+                $cmd = "echo \"".$sql."\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+                foreach (`$cmd`) {
+                    @p = split '\t', $_;
+                    $indexes{$tableName}{$p[4]} = 1;
+                }
+            }
+
+            if ( ! defined($indexes{$tableName}{$column})) {
+                push @sql, "alter table ".$tableName." add index(".$column."(10));";
+            }
+
+            push @sql, "update ".$tableName." set ".$column." = ".
+                    "concat(substr(".$column.",7,4),\"-\",substr(".$column.",1,2),\"-\",substr(".$column.",4,2)) ".
+                    "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/.*';";
+
+            push @sql, "update ".$tableName." set ".$column." = ".
+                    "concat(substr(".$column.",6,4),\"-0\",substr(".$column.",1,1),\"-\",substr(".$column.",3,2)) ".
+                    "where ".$column." rlike '^[0-9]/[0-9][0-9]/.*';";
+
+            push @sql, "update ".$tableName." set ".$column." = ".
+                    "concat(substr(".$column.",6,4),\"-\",substr(".$column.",1,2),\"-0\",substr(".$column.",4,1)) ".
+                    "where ".$column." rlike '^[0-9][0-9]/[0-9]/.*';";
+
+            push @sql, "update ".$tableName." set ".$column." = ".
+                    "concat(substr(".$column.",5,4),\"-0\",substr(".$column.",1,1),\"-0\",substr(".$column.",3,1)) ".
+                    "where ".$column." rlike '^[0-9]/[0-9]/.*';";
+
+            push @sql, "update ".$tableName." set ".$column." = NULL where ".$column." = '0000-00-00';";
+
+            push @counts, "select count(*) from ".$tableName." where ".$column." not rlike '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]';";
+        }
+    }
+
+    if ($line =~ / datetime$/) {
+
+        $column = $line;
+        $column =~ s/ datetime$//;
+
+        if (defined($allTables) || defined($tables{$tableName})) {
+
+            print "fix datetime: table: \"".$tableName."\", column: \"".$column."\"\n";
+
+            if ( ! defined($indexes{$tableName})) {
+                $sql = "show index from cvr_campaign_disclosure;";
+                $cmd = "echo \"".$sql."\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+                foreach (`$cmd`) {
+                    @p = split '\t', $_;
+                    $indexes{$tableName}{$p[4]} = 1;
+                }
+            }
+
+            if ( ! defined($indexes{$tableName}{$column})) {
+                push @sql, "alter table ".$tableName." add index(".$column."(20));";
+            }
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",7,4), \"-\", substr(".$column.",1,2),\"-\", substr(".$column.",4,2), substr(".$column.", 11)) ".
+                    "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",7,4), \"-\", substr(".$column.",1,2),\"-\", substr(".$column.",4,2), \" 0\", substr(".$column.", 12)) ".
+                    "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",6,4), \"-\", substr(".$column.",1,2), \"-0\", substr(".$column.",4,1), substr(".$column.", 10)) ".
+                    "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",6,4), \"-\", substr(".$column.",1,2), \"-0\", substr(".$column.",4,1), \" 0\", substr(".$column.", 11)) ".
+                    "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",6,4), \"-0\", substr(".$column.",1,1), \"-\", substr(".$column.",3,2), substr(".$column.", 10)) ".
+                    "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",6,4), \"-0\", substr(".$column.",1,1), \"-\", substr(".$column.",3,2), \" 0\", substr(".$column.", 11)) ".
+                    "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",5,4), \"-0\", substr(".$column.",1,1), \"-0\", substr(".$column.",3,1), substr(".$column.", 9)) ".
+                    "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            push @sql, "update ".$tableName.
+                    " set ".$column." = concat(substr(".$column.",5,4), \"-0\", substr(".$column.",1,1), \"-0\", substr(".$column.",3,1), \" 0\", substr(".$column.", 10)) ".
+                    "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
+
+            #
+            # Now I have the date like: 2012-02-22 01:14:33 PM
+            #
+            # MySQL form would not have the AM/PM and needs to be on a 24-hour clock.
+            #
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'00',substr(".$column.",14,6)) where ".$column." like '% 12:00:00 AM';";
+            push @sql, "update ".$tableName." set ".$column." = substr(".$column.",1,19) where ".$column." like '% AM';";
+            push @sql, "update ".$tableName." set ".$column." = substr(".$column.",1,19) where ".$column." like '% 12:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'13',substr(".$column.",14,6)) where ".$column." like '% 01:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'14',substr(".$column.",14,6)) where ".$column." like '% 02:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'15',substr(".$column.",14,6)) where ".$column." like '% 03:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'16',substr(".$column.",14,6)) where ".$column." like '% 04:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'17',substr(".$column.",14,6)) where ".$column." like '% 05:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'18',substr(".$column.",14,6)) where ".$column." like '% 06:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'19',substr(".$column.",14,6)) where ".$column." like '% 07:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'20',substr(".$column.",14,6)) where ".$column." like '% 08:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'21',substr(".$column.",14,6)) where ".$column." like '% 09:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'22',substr(".$column.",14,6)) where ".$column." like '% 10:% PM';";
+            push @sql, "update ".$tableName." set ".$column." = concat(substr(".$column.",1,11),'23',substr(".$column.",14,6)) where ".$column." like '% 11:% PM';";
+
+            push @counts, "select count(*) from ".$tableName." where ".$column." not rlike '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] ';";
+        }
+    }
+
+    $last = $line;
+}
+
+if ( ! defined($dryrun)) {
+    open M, "| ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+} else {
+    open M, "| cat -";
+}
+
+foreach (@sql) { print M $_."\n"; }
+
+close M;
+
+open M, "| ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+
+foreach (@counts) { print M $_."\n"; }
+
+close M;
+
+exit(0);
+
