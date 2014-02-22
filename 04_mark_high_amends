@@ -15,7 +15,7 @@ if ( ! defined($importDate)) {
 }
 
 if ( ! defined(%tables)) {
-    open T, "tableCols.txt";
+    open T, "scripts/tableCols.txt";
     while (<T>) {
         chomp;
         $line = $_;

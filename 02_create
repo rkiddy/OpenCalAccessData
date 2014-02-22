@@ -31,7 +31,7 @@ if (defined($allTables) && (scalar(keys %tables)) > 0) {
     exit(0);
 }
 
-open T, "tableCols.txt";
+open T, "scripts/tableCols.txt";
 while (<T>) {
     chomp;
     $line = $_;

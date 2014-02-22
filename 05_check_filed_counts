@@ -36,7 +36,7 @@ if (defined($dryrun)) {
 #
 # get the info on which tables have a filing_id and/or a filer_id column.
 #
-open F, "tableCols.txt";
+open F, "scripts/tableCols.txt";
 while (<F>) {
     chomp;
     $line = $_;

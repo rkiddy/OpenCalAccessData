@@ -19,7 +19,7 @@ if (scalar(@ARGV) == 0 || ! defined($importDate) || ( ! defined($allTables) && s
     exit(0);
 }
 
-open T, "tableCols.txt";
+open T, "scripts/tableCols.txt";
 while (<T>) {
     chomp;
     $line = $_;
