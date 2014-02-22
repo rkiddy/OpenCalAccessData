@@ -50,18 +50,18 @@ to do so. I would love to hear from you.
 
 ---------------
 
-00_fix_dload_files
-01_import
-02_create
-03_fix_dates
-04_mark_high_amends
-05_check_filed_counts
-06_drop_cds
-09_move_database
-0a_test_data
-check_filing_id
-check_states
-options.pl
+* 00_fix_dload_files
+* 01_import
+* 02_create
+* 03_fix_dates
+* 04_mark_high_amends
+* 05_check_filed_counts
+* 06_drop_cds
+* 09_move_database
+* 0a_test_data
+* check_filing_id
+* check_states
+* options.pl
 
 ----------------
 
