@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+
+require "scripts/options.pl";
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+    if ($arg !~ /^\-/) { $tables{$_} = 1; }
+}
+
+if ( ! defined($importDate)) {
+    print "\nusage: ./05_mark_high_amends -date <YYYYMMDD> [ <tables> ]\n\n";
+    exit(0);
+}
+
+if ( ! defined(%tables)) {
+    open T, "tableCols.txt";
+    while (<T>) {
+        chomp;
+        $line = $_;
+        if ($line ne "" && $line !~ / /) { $tName = $_; }
+        if ($line =~ /amend_id/) { $tables{$tName} = 1; }
+    }
+}
+
+delete $tables{"filings"};
+
+$cmd = "echo \"desc filer_filings;\" | ".$myQ."_".$importDate;
+@cols = `$cmd`;
+
+foreach (@cols) {
+    @p = split '\t', $_;
+    if ($p[0] eq "high_amend_id") { $foundHighAmend = 1; }
+}
+
+if ( ! defined($foundHighAmend)) {
+    print "No high_amend_id column. Altering table...";
+    $cmd = "echo \"alter table filer_filings add column high_amend_id int after filing_id;\" | ".$myV."_".$importDate;
+    print `$cmd`;
+}
+
+open M, "| ".$myV."_".$importDate;
+
+foreach (sort keys %tables) {
+    $table = $_;
+
+    print $table."...";
+
+    print M "update filer_filings f1, (select filing_id, max(amend_id) as max from ".$table." group by filing_id) as a1 ".
+            "set f1.high_amend_id = a1.max where f1.filing_id = a1.filing_id and (f1.high_amend_id is NULL or f1.high_amend_id < a1.max);\n";
+
+    print "\n";
+}
+
+close M;
+
+print "\n\n";
+
+exit(0);

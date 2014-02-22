@@ -1,0 +1,1230 @@
+#!/usr/bin/perl
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-all") { $allFiles = 1; }
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+    if ($arg eq "-v") { $verbose = 1; }
+    if ($arg eq "-vv") { $verbose = 2; }
+
+    if ($arg !~ /^\-/) { $files{$arg} = 1; }
+}
+
+$date = `date '+%Y%m%d_%H%M%S'`;
+chomp($date);
+
+if ( ! defined($allFiles) && scalar(keys %files) == 0) {
+    print "\nusage: ./00_fix_dload_files -date <YYYYMMDD> ( -all | <files> )\n\n";
+    exit(0);
+}
+
+if (defined($verbose) && scalar(%files) > 0) {
+    foreach (sort keys %files) { print "given table: \"".$_."\"\n"; }
+}
+
+if (defined($allFiles)) {
+    $cmd = "( cd data_".$importDate."/Data ; /bin/ls *_CD.TSV )";
+    @files = `$cmd`;
+    chomp(@files);
+
+    foreach (@files) { $files{$_} = 1; }
+
+} else {
+
+    foreach (keys %files) {
+        $file = $_;
+        $file = uc($file);
+        if ($file !~ /_CD\.TSV/) {
+            $file = $file."_CD.TSV";
+        }
+        $nextFiles{$file} = 1;
+    }
+    %files = %nextFiles;
+}
+
+sub remove_field {
+    $toRemove = $_[0];
+    local @q = @_;
+    shift @q;
+
+    undef @next;
+    for ($idx = 0; $idx < scalar(@q); $idx++) {
+        if ($idx != $toRemove) { push @next, $q[$idx]; }
+    }
+    return @next;
+}
+
+sub add_empty_field_at_end {
+    local @q = @_;
+    undef @next;
+
+    for ($idx = 0; $idx < scalar(@q)-1; $idx++) { push @next, $q[$idx]; }
+
+    $last = $q[scalar(@q)-1];
+    $last =~ s/[\r\n]//g;
+
+    push @next, $last;
+
+    push @next, "\r\n";
+
+    return @next;
+}
+
+sub add_field {
+    $toAdd = $_[0];
+
+    local @q = @_;
+    shift @q;
+
+    undef @next;
+
+    for ($idx = 0; $idx < $toAdd; $idx++) { push @next, $q[$idx]; }
+    push @next, "";
+    for ($idx = $toAdd; $idx < scalar(@q); $idx++) { push @next, $q[$idx]; }
+
+    return @next;
+}
+
+sub compare_results {
+
+    $cmd = "diff ".$file." ".$outFile;
+
+    @changes = `$cmd`;
+
+    if ($verbose > 1) {
+        print "\ncompare_results: changes:\n".(join "\n", @changes)."\n";
+    }
+
+    if (scalar(@changes) == 0) {
+        if (defined($verbose)) { print "\nNo changes, removing FIXED file.\n"; }
+        unlink $outFile;
+    } else {
+        print "\nchanged ".scalar(@changes).", original data -> \"".$file."_ORIG_".$date."\"\n";
+        rename $file, $file."_ORIG_".$date;
+        rename $outFile, $file;
+    }
+}
+
+
+# ACRONYMS_CD.TSV
+#
+$file = "ACRONYMS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# ADDRESS_CD.TSV
+#
+$file = "ADDRESS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# BALLOT_MEASURES_CD.TSV
+#
+$file = "BALLOT_MEASURES_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+
+}
+
+# CVR2_CAMPAIGN_DISCLOSURE_CD.TSV
+#
+$file = "CVR2_CAMPAIGN_DISCLOSURE_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        $line =~ s/\\\t/\t/g;
+
+        @p = split '\t', $line;
+
+        if ($p[13] eq "Marilyn Lyon Election Debt Committee" && $p[18] eq "c") {
+            $p[18] = "CA";
+            $line = join "\t", @p;
+        }
+
+        if ($p[17] eq "Fresno CA") {
+            $p[17] = "Fresno";
+            $p[18] = "CA";
+            $line = join "\t", @p;
+        }
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# CVR2_LOBBY_DISCLOSURE_CD.TSV
+#
+$file = "CVR2_LOBBY_DISCLOSURE_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+
+}
+
+# CVR2_REGISTRATION_CD.TSV
+#
+$file = "CVR2_REGISTRATION_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+
+}
+
+# CVR2_SO_CD.TSV
+#
+$file = "CVR2_SO_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+
+}
+
+# CVR3_VERIFICATION_INFO_CD.TSV
+#
+$file = "CVR3_VERIFICATION_INFO_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# CVR_CAMPAIGN_DISCLOSURE_CD.TSV
+#
+$file = "CVR_CAMPAIGN_DISCLOSURE_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        $line =~ s/\\\t/\t/g;
+
+        @p = split '\t', $line;
+
+        if ($line =~ /^871430\t0\t/ || $line =~ /^948141\t0\t/) {
+            if ($p[17] eq "BLUM RO" && $p[18] eq "AD" && $p[19] eq "5034") {
+                $p[17] = "MARTINEZ";
+                $p[18] = "CA";
+                $p[19] = "94553";
+                $line = join "\t", @p;
+                $changed++;
+            }
+        }
+
+        # Oakland is in CA and not in "AC".
+        #
+        if ($line =~ /^1212884\t/ && $line =~ /\tOakland\tAC\t/) { $line =~ s/\tOakland\tAC\t/\tOakland\tCA\t/; $changed++; }
+        if ($line =~ /^1218926\t/ && $line =~ /\tOakland\tAC\t/) { $line =~ s/\tOakland\tAC\t/\tOakland\tCA\t/; $changed++; }
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# CVR_E530_CD.TSV
+#
+$file = "CVR_E530_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# CVR_LOBBY_DISCLOSURE_CD.TSV
+#
+$file = "CVR_LOBBY_DISCLOSURE_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# CVR_REGISTRATION_CD.TSV
+#
+$file = "CVR_REGISTRATION_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# CVR_SO_CD.TSV
+
+$file = "CVR_SO_CD.TSV";
+#
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# DEBT_CD.TSV
+#
+$file = "DEBT_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# EFS_FILING_LOG_CD.TSV
+#
+$file = "EFS_FILING_LOG_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        $line =~ s/\\\t/\t/;
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# EXPN_CD.TSV
+#
+$file = "EXPN_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    $top = <F1>;
+    print F2 $top;
+
+    while (<F1>) {
+        $line = $_;
+
+        # There are a few lines where backslashes at the end of a field are messing up the columns.
+        # See filing_id = 592403, amend_id = 0, line_item = 82 and filing_id = 592403, amend_id = 1, line_item = 74.
+        #
+        $line =~ s/\\\t/\t/g;
+
+        @p = split '\t', $line;
+
+        undef @next;
+
+        if ($p[14] ne "" && $p[14] !~ /^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4} /) {
+            @p = &remove_field(7, @p);
+            @p = &add_empty_field_at_end(@p);
+            $line = join "\t", @p;
+            $changed++;
+        }
+
+        # Row of data chopped into two.
+        #
+        # Is it worth pulling a "put together 2 lines of x and y columns into one x+y-1 row" worth its own subroutine? We will see.
+        #
+        if ($line =~ /^1606358\t0\t8\t/ && scalar(@p) == 8) {
+            $last = pop @p;
+            $last =~ s/[\r\n]//g;
+            push @p, $last;
+            @nextP = split '\t', <F1>;
+            shift @nextP;
+            push @p, @nextP;
+            $line = join "\t", @p;
+            $changed++;
+        }
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# F495P2_CD.TSV
+#
+$file = "F495P2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# F501_502_CD.TSV
+#
+$file = "F501_502_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# F690P2_CD.TSV
+#
+$file = "F690P2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_ACRONYMS_CD.TSV
+#
+$file = "FILER_ACRONYMS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_ADDRESS_CD.TSV
+#
+$file = "FILER_ADDRESS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_ETHICS_CLASS_CD.TSV
+#
+$file = "FILER_ETHICS_CLASS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_FILINGS_CD.TSV
+#
+$file = "FILER_FILINGS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_INTERESTS_CD.TSV
+#
+$file = "FILER_INTERESTS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_LINKS_CD.TSV
+#
+$file = "FILER_LINKS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILERNAME_CD.TSV
+#
+$file = "FILERNAME_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    @lines = <F1>;
+    close F1;
+
+    for ($idx = 0; $idx < scalar(@lines); $idx++) {
+        $line = $lines[$idx];
+
+        if ($line eq "") { next; }
+
+        $line =~ s/ *\t/\t/;
+
+        $line =~ s/\\ CHANDLER/\/ CHANDLER/;
+
+        $line =~ s/LOCK\\LINE/LOCK\/LINE/;
+
+        $line =~ s/\\$//g;
+        $line =~ s/\\\r/\r/;
+
+        @p1 = split "\t", $line;
+
+        if (scalar(@p1) < 17) {
+            @p2 = split "\t", $lines[$idx+1];
+            if ((scalar(@p1) + scalar(@p2)) == 18) {
+                chomp(@p1);
+                $p1[scalar(@p1)-1] =~ s/\r//;
+                shift @p2;
+                $line = (join "\t", @p1)."\t".(join "\t", @p2);
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line !~ /^\s*$/) { print F2 $line; }
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# FILERS_CD.TSV
+#
+$file = "FILERS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_STATUS_TYPES_CD.TSV
+#
+$file = "FILER_STATUS_TYPES_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_TO_FILER_TYPE_CD.TSV
+#
+$file = "FILER_TO_FILER_TYPE_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        $line =~ s/\/3000 12:/\/2000 12:/;
+        $line =~ s/\/8200 12:/\/2003 12:/;
+        $line =~ s/\/8004 12:/\/2004 12:/;
+        $line =~ s/\/2906 12:/\/2006 12:/;
+        $line =~ s/\/5005 12:/\/2005 12:/;
+        $line =~ s/\/9006 12:/\/2006 12:/;
+        $line =~ s/\/6008 12:/\/2008 12:/;
+        $line =~ s/\/2208 12:/\/2008 12:/;
+        $line =~ s/\/2030 12:/\/2009 12:/;
+        $line =~ s/\/3010 12:/\/2010 12:/;
+        $line =~ s/\/2020 12:/\/2010 12:/;
+        $line =~ s/\/8201 12:/\/2010 12:/;
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+# FILER_TYPES_CD.TSV
+#
+$file = "FILER_TYPES_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILER_XREF_CD.TSV
+#
+$file = "FILER_XREF_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILING_PERIOD_CD.TSV
+#
+$file = "FILING_PERIOD_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# FILINGS_CD.TSV
+#
+$file = "FILINGS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# GROUP_TYPES_CD.TSV
+#
+$file = "GROUP_TYPES_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# HDR_CD.TSV
+#
+$file = "HDR_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# HEADER_CD.TSV
+#
+$file = "HEADER_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# IMAGE_LINKS_CD.TSV
+#
+$file = "IMAGE_LINKS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LATT_CD.TSV
+#
+$file = "LATT_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LCCM_CD.TSV
+#
+$file = "LCCM_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LEGISLATIVE_SESSIONS_CD.TSV
+#
+$file = "LEGISLATIVE_SESSIONS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LEMP_CD.TSV
+#
+$file = "LEMP_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LEXP_CD.TSV
+#
+$file = "LEXP_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOAN_CD.TSV
+#
+$file = "LOAN_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBY_AMENDMENTS_CD.TSV
+#
+$file = "LOBBY_AMENDMENTS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYING_CHG_LOG_CD.TSV
+#
+$file = "LOBBYING_CHG_LOG_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        $line =~ s/EMERB\\GENCY/EMERGENCY/;
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
+}
+
+
+# LOBBYIST_CONTRIBUTIONS1_CD.TSV
+#
+$file = "LOBBYIST_CONTRIBUTIONS1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_CONTRIBUTIONS2_CD.TSV
+#
+$file = "LOBBYIST_CONTRIBUTIONS2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_CONTRIBUTIONS3_CD.TSV
+#
+$file = "LOBBYIST_CONTRIBUTIONS3_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMP_LOBBYIST1_CD.TSV
+#
+$file = "LOBBYIST_EMP_LOBBYIST1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMP_LOBBYIST2_CD.TSV
+#
+$file = "LOBBYIST_EMP_LOBBYIST2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMPLOYER1_CD.TSV
+#
+$file = "LOBBYIST_EMPLOYER1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMPLOYER2_CD.TSV
+#
+$file = "LOBBYIST_EMPLOYER2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMPLOYER3_CD.TSV
+#
+$file = "LOBBYIST_EMPLOYER3_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMPLOYER_FIRMS1_CD.TSV
+#
+$file = "LOBBYIST_EMPLOYER_FIRMS1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_EMPLOYER_FIRMS2_CD.TSV
+#
+$file = "LOBBYIST_EMPLOYER_FIRMS2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM1_CD.TSV
+#
+$file = "LOBBYIST_FIRM1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM2_CD.TSV
+#
+$file = "LOBBYIST_FIRM2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM3_CD.TSV
+#
+$file = "LOBBYIST_FIRM3_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM_EMPLOYER1_CD.TSV
+#
+$file = "LOBBYIST_FIRM_EMPLOYER1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM_EMPLOYER2_CD.TSV
+#
+$file = "LOBBYIST_FIRM_EMPLOYER2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM_LOBBYIST1_CD.TSV
+#
+$file = "LOBBYIST_FIRM_LOBBYIST1_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOBBYIST_FIRM_LOBBYIST2_CD.TSV
+#
+$file = "LOBBYIST_FIRM_LOBBYIST2_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOOKUP_CODES_CD.TSV
+#
+$file = "LOOKUP_CODES_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LOTH_CD.TSV
+#
+$file = "LOTH_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# LPAY_CD.TSV
+#
+$file = "LPAY_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# NAMES_CD.TSV
+#
+$file = "NAMES_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    @lines = <F1>;
+    close F1;
+
+    for ($idx = 0; $idx < scalar(@lines); $idx++) {
+        $line = $lines[$idx];
+
+        $line =~ s/ *$//;
+        $line =~ s/^ *//;
+        $line =~ s/ *\t/\t/g;
+
+        # NAMID: "1305806"
+        # NAML: "SMITH"
+        # NAMF: ""
+        # NAMT: "KATHI"
+        # NAMS: ""
+
+        $line =~ s/1305806\tSMITH\t\tKATHI\t/1305806\tSMITH\tKATHI/;
+
+        # NAMID: "1347597"
+        # NAML: "GABELICH, FRIENDS TO RE-ELECT RAE"
+        # NAMF: MISSING DATA
+        # NAMT: MISSING DATA
+        # NAMS: MISSING DATA
+        # MONIKER: MISSING DATA
+        # MONIKER_POS: MISSING DATA
+        # NAMM: MISSING DATA
+        # FULLNAME: MISSING DATA
+        # NAML_SEARCH: MISSING DATA
+
+        # NAMID: ""
+        # NAML: ""
+        # NAMF: ""
+        # NAMT: ""
+        # NAMS: ""
+        # MONIKER: ""
+        # MONIKER_POS: ""
+        # NAMM: ""
+        # FULLNAME: "GABELICH, FRIENDS TO RE-ELECT RAE"
+        # NAML_SEARCH: MISSING DATA
+
+        if ($line =~ /^1347597\tGABELICH, FRIENDS TO RE-ELECT RAE/) {
+            $line = "1347597\t".
+                    "GABELICH, FRIENDS TO RE-ELECT RAE".
+                    "\t\t\t\t\t\t\t\t".
+                    "GABELICH, FRIENDS TO RE-ELECT RAE\r\n";
+            if ($lines[$idx+1] =~ /GABELICH, FRIENDS TO RE-ELECT RAE/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        # same thing, different name
+
+        if ($line =~ /^1347621\tPOIZNER'S GOOD DRIVERS FOR FINANCIAL ACCOUNTABILITY, STEVE/) {
+            $line = "1347621\t".
+                    "POIZNER'S GOOD DRIVERS FOR FINANCIAL ACCOUNTABILITY, STEVE".
+                    "\t\t\t\t\t\t\t\t".
+                    "POIZNER'S GOOD DRIVERS FOR FINANCIAL ACCOUNTABILITY, STEVE\r\n";
+            if ($lines[$idx+1] =~ /POIZNER'S GOOD DRIVERS FOR FINANCIAL ACCOUNTABILITY, STEVE/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1347670\tCALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND/) {
+            $line = "1347670\t".
+                    "CALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND (CCPOA TAG FUND)".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND (CCPOA TAG FUND)\r\n";
+            if ($lines[$idx+1] =~ /CALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1346540\tCALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS/) {
+            $line = "1346540\t".
+                    "CALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS\r\n";
+            if ($lines[$idx+1] =~ /CALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1348141\tCHAMBERLAIN FOR SUPERVISOR/) {
+            $line = "1348141\t".
+                    "CHAMBERLAIN FOR SUPERVISOR".
+                    "\t\t\t\t\t\t\t\t".
+                    "CHAMBERLAIN FOR SUPERVISOR\r\n";
+            if ($lines[$idx+1] =~ /CHAMBERLAIN FOR SUPERVISOR/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1349136\tMARSY'S LAW JUSTICE FOR CRIME VICTIMS/) {
+            $line = "1349136\t".
+                    "MARSY'S LAW JUSTICE FOR CRIME VICTIMS".
+                    "\t\t\t\t\t\t\t\t".
+                    "MARSY'S LAW JUSTICE FOR CRIME VICTIMS\r\n";
+            if ($lines[$idx+1] =~ /MARSY'S LAW JUSTICE FOR CRIME VICTIMS/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1347849\tCALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS/) {
+            $line = "1347849\t".
+                    "CALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS - NO ON 92".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS - NO ON 92\r\n";
+            if ($lines[$idx+1] =~ /CALIFORNIANS FOR FAIR EDUCATION FUNDING, A COALITION OF BUSINESS EDUCATORS AND TAXPAYERS/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1358368\tCITIZENS FOR EXCELLENT PACIFIC GROVE SCHOOLS YES ON MEASURE X/) {
+            $line = "1358368\t".
+                    "CITIZENS FOR EXCELLENT PACIFIC GROVE SCHOOLS YES ON MEASURE X".
+                    "\t\t\t\t\t\t\t\t".
+                    "CITIZENS FOR EXCELLENT PACIFIC GROVE SCHOOLS YES ON MEASURE X\r\n";
+            if ($lines[$idx+1] =~ /CITIZENS FOR EXCELLENT PACIFIC GROVE SCHOOLS YES ON MEASURE X/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1369708\tCALLOWAY SUPERVISOR DISTRICT 10, COMMITTEE TO ELECT DR. JAMES/) {
+            $line = "1369708\t".
+                    "CALLOWAY SUPERVISOR DISTRICT 10, COMMITTEE TO ELECT DR. JAMES".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALLOWAY SUPERVISOR DISTRICT 10, COMMITTEE TO ELECT DR. JAMES\r\n";
+            if ($lines[$idx+1] =~ /CALLOWAY SUPERVISOR DISTRICT 10, COMMITTEE TO ELECT DR. JAMES/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1373561\tDENIAL OF PUBLIC BENEFITS FOR PERSONS WHO CANNOT VERIFY LAWFUL PRESENCE. DENIAL OF BIRTH CERTIFICATES TO CHILDREN OF UNDOCUMENTED PARENTS WHO FAIL TO VERIFY STATUS. INITIATIVE STATUTE. 1358/) {
+            $line = "1373561\t".
+                    "DENIAL OF PUBLIC BENEFITS FOR PERSONS WHO CANNOT VERIFY LAWFUL PRESENCE. DENIAL OF BIRTH CERTIFICATES TO CHILDREN OF UNDOCUMENTED PARENTS WHO FAIL TO VERIFY STATUS. INITIATIVE STATUTE. 1358".
+                    "\t\t\t\t\t\t\t\t".
+                    "DENIAL OF PUBLIC BENEFITS FOR PERSONS WHO CANNOT VERIFY LAWFUL PRESENCE. DENIAL OF BIRTH CERTIFICATES TO CHILDREN OF UNDOCUMENTED PARENTS WHO FAIL TO VERIFY STATUS. INITIATIVE STATUTE. 1358\r\n";
+            if ($lines[$idx+1] =~ /DENIAL OF PUBLIC BENEFITS FOR PERSONS WHO CANNOT VERIFY LAWFUL PRESENCE. DENIAL OF BIRTH CERTIFICATES TO CHILDREN OF UNDOCUMENTED PARENTS WHO FAIL TO VERIFY STATUS. INITIATIVE STATUTE. 1358/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1381948\tCALLOWAY DISTRICT 10, COMMITTEE TO ELECT DR. JAMES/) {
+            $line = "1381948\t".
+                    "CALLOWAY DISTRICT 10, COMMITTEE TO ELECT DR. JAMES".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALLOWAY DISTRICT 10, COMMITTEE TO ELECT DR. JAMES\r\n";
+            if ($lines[$idx+1] =~ /CALLOWAY DISTRICT 10, COMMITTEE TO ELECT DR. JAMES/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1386247\tCALLOWAY DISTRICT 10 SUPERVISOR 2010, COMMITTEE TO ELECT DR. JAMES/) {
+            $line = "1386247\t".
+                    "CALLOWAY DISTRICT 10 SUPERVISOR 2010, COMMITTEE TO ELECT DR. JAMES".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALLOWAY DISTRICT 10 SUPERVISOR 2010, COMMITTEE TO ELECT DR. JAMES\r\n";
+            if ($lines[$idx+1] =~ /CALLOWAY DISTRICT 10 SUPERVISOR 2010, COMMITTEE TO ELECT DR. JAMES/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line =~ /^1441157\tCALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND/) {
+            $line = "1441157\t".
+                    "CALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND".
+                    "\t\t\t\t\t\t\t\t".
+                    "CALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND\r\n";
+            if ($lines[$idx+1] =~ /CALIFORNIA CORRECTIONAL PEACE OFFICERS ASSOCIATION TRUTH IN AMERICAN GOVERNMENT FUND/) {
+                $lines[$idx+1] = "";
+            }
+        }
+
+        if ($line !~ /^\s*$/) { print F2 $line; }
+    }
+
+    close F2;
+
+    &compare_results();
+}
+
+# RCPT_CD.TSV
+#
+$file = "RCPT_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    @lines = <F1>;
+    close F1;
+     
+    for ($idx = 0; $idx < scalar(@lines); $idx++) {
+        $line = $lines[$idx];
+
+        @p = split '\t', $line;
+        if (scalar(@p) < 60 && $lines[$idx+1] =~ /^BER CONTENT/) {
+            chomp($line);
+            $line =~ s/\r//;
+            print F2 $line."U".$lines[$idx+1];
+            $lines[$idx+1] = "";
+        }
+        if ($line !~ /^\s*$/) { print F2 $line; }
+    }
+
+    close F2;
+
+    &compare_results();
+}
+
+# RECEIVED_FILINGS_CD.TSV
+#
+$file = "RECEIVED_FILINGS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# REPORTS_CD.TSV
+#
+$file = "REPORTS_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# S401_CD.TSV
+#
+$file = "S401_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# S496_CD.TSV
+#
+$file = "S496_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# S497_CD.TSV
+#
+$file = "S497_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# S498_CD.TSV
+#
+$file = "S498_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# SMRY_CD.TSV
+#
+$file = "SMRY_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# SPLT_CD.TSV
+#
+$file = "SPLT_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+}
+
+# TEXT_MEMO_CD.TSV
+#
+# cols: FILING_ID AMEND_ID LINE_ITEM REC_TYPE FORM_TYPE REF_NO TEXT4000
+#
+$file = "TEXT_MEMO_CD.TSV";
+
+if (defined($allFiles) || defined($files{$file})) {
+
+    $outFile = $file."_FIXED";
+
+    $changed = 0;
+
+    print "\nfixing ".$file."...";
+
+    $cmd = "/usr/bin/tr '\\r' '\\n' < ".$file." | /bin/grep -v \'^\$\' | /usr/bin/perl -p -e 's/\\n/\\r\\n/g' -";
+
+    @lines = `$cmd`;
+
+    open T, ">".$outFile;
+
+    foreach (@lines) {
+        $line = $_;
+
+        @p = split '\t', $line;
+
+        if (scalar(@p) <= 7) {
+            print T $line;
+        } else {
+            for ($idx = 0; $idx <= 5; $idx++) { print T $p[$idx]."\t"; }
+            for ($idx = 6; $idx < scalar(@p); $idx++) { print T " ".$p[$idx]; }
+        }
+    }
+
+    close $outFile;
+
+    &compare_results();
+}
+
+print "\n\nOk\n\n";
+
+exit(0);

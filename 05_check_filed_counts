@@ -1,0 +1,229 @@
+#!/usr/bin/perl
+
+require "scripts/options.pl";
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-v") { $verbose = 1; }
+    if ($arg eq "-dryrun") { $dryrun = 1; }
+    if ($arg eq "-initonly") { $initOnly = 1; }
+    if ($arg eq "-nodrop") { $noDrop = 1; }
+    if ($arg eq "-nofill") { $noFill = 1; }
+    if ($arg eq "-filingonly") { $filingOnly = 1; }
+    if ($arg eq "-fileronly") { $filerOnly = 1; }
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+}
+
+if ( ! defined($importDate)) {
+    print "\nPlease give me an import date as a parameter.\n\n";
+    exit(0);
+}
+
+if ( ! defined($filingOnly) && ! defined($filerOnly)) { $bothTables = 1; }
+
+$myV = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv --force ".&option("dbName")."_".$importDate;
+$myQ = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names --force ".&option("dbName")."_".$importDate;
+
+if (defined($dryrun)) {
+    $pipeDBv = "| cat -";
+    $pipeDBq = "| cat -";
+} else {
+    $pipeDBv = "| ".$myV;
+    $pipeDBq = "| ".$myQ;
+}
+
+#
+# get the info on which tables have a filing_id and/or a filer_id column.
+#
+open F, "tableCols.txt";
+while (<F>) {
+    chomp;
+    $line = $_;
+    @p = split ' ', $line;
+
+    if ($line ne "" && $line !~ / /) {
+        $table = $p[0];
+    } else {
+        if ($table ne "filer_filings") {
+            if ($p[0] eq "filing_id") { $filingsTables{$table} = 1; }
+            if ($p[0] eq "filer_id") { $filersTables{$table} = 1; }
+        }
+    }
+}
+
+#
+# Why the FUCK does the "filer_ethics_class" appear in the list of tables having a filing_id column?
+# And why did this seem to have two columns named "filer_id"?
+# What is wrong here?
+#
+delete $filingsTables{"filer_ethics_class"};
+
+#
+# create the tables, if we are going to do it.
+#
+if ( ! defined($noDrop)) {
+
+    open M, $pipeDBv;
+
+    if (defined($bothTables) || defined($filingOnly)) {
+        print M "drop table if exists filings_counted;\n";
+        print M "create table filings_counted (\n";
+        print M "    filing_id int primary key,\n";
+        print M "    filing_type int,\n";
+        undef @sql;
+        foreach (sort keys %filingsTables) {
+            push @sql, "    ".$_." int default 0";
+        }
+        print M join (",\n", @sql);
+        print M "    filing_sum int default 0);\n";
+    }
+
+    if (defined($bothTables) || defined($filerOnly)) {
+        print M "drop table if exists filers_counted;\n";
+        print M "create table filers_counted (\n";
+        print M "    filer_id varchar(30) primary key,\n";
+        undef @sql;
+        foreach (sort keys %filersTables) {
+            push @sql, "    ".$_." int default 0";
+        }
+        print M join (",\n", @sql);
+        print M "    filer_sum int default 0);\n";
+    }
+
+    close M;
+}
+
+if (defined($initOnly)) { print "\n"; exit(0); }
+
+if ( ! defined($noFill)) {
+    open M, $pipeDBv;
+
+    if (defined($bothTables) || defined($filingOnly)) {
+        foreach (sort keys %filingsTables) {
+            print M "insert ignore into filings_counted (filing_id) select filing_id from ".$_.";\n";
+        }
+    }
+
+    if (defined($bothTables) || defined($filerOnly)) {
+        foreach (sort keys %filersTables) {
+            print M "insert ignore into filers_counted (filer_id) select filer_id from ".$_.";\n";
+        }
+    }
+
+    close M;
+}
+
+if (defined($bothTables) || defined($filingOnly)) {
+
+    foreach (sort keys %filingsTables) {
+
+        $table = $_;
+        print "filings, ".$table."...\n";
+
+        undef %filingCounts;
+        undef %filings;
+
+        $cmd = "echo \"select filing_id, count(*) from ".$table." group by filing_id;\" | ".$myQ;
+        @ids = `$cmd`;
+        chomp(@ids);
+        #print "ids # ".scalar(@ids)."\n";
+
+        foreach (@ids) {
+            ($id, $count) = split '\t', $_;
+            if ( ! defined($filingCounts{$count})) {
+                $filingCounts{$count} = 1;
+                $filings{$count}[0] = $id;
+            } else {
+                $filings{$count}[$filingCounts{$count}] = $id;
+                $filingCounts{$count}++;
+            }
+        }
+
+        open M, $pipeDBq;
+
+        foreach (sort keys %filingCounts) {
+            $count = $_;
+            #print "Count: ".$count." # ".$filingCounts{$count}."\n";
+            undef @filingIds;
+            for ($idx = 0; defined($filings{$count}[$idx]); $idx++) {
+                push @filingIds, $filings{$count}[$idx];
+                if ($idx > 0 && ($idx % 1000) == 0) {
+                    print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
+                    undef @filingIds;
+                }
+            }
+            if (defined(@filingIds)) {
+                print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
+            }
+        }
+        print "\n";
+
+        close M;
+    }
+
+    open M, $pipeDBv;
+
+    print M "update filings_counted set filing_sum = ".(join ' + ', sort keys %filingsTables).";\n";
+
+    close M;
+}
+
+if (defined($bothTables) || defined($filerOnly)) {
+
+    foreach (sort keys %filersTables) {
+
+        $table = $_;
+        print "filers, ".$table."...\n";
+
+        undef %filerCounts;
+        undef %filers;
+
+        $cmd = "echo \"select filer_id, count(*) from ".$table." group by filer_id;\" | ".$myQ;
+        @ids = `$cmd`;
+        chomp(@ids);
+        #print "ids # ".scalar(@ids)."\n";
+
+        foreach (@ids) {
+            ($id, $count) = split '\t', $_;
+            if ( ! defined($filerCounts{$count})) {
+                $filerCounts{$count} = 1;
+                $filers{$count}[0] = "'".$id."'";
+            } else {
+                $filers{$count}[$filerCounts{$count}] = "'".$id."'";
+                $filerCounts{$count}++;
+            }
+        }
+
+        open M, $pipeDBq;
+
+        foreach (sort keys %filerCounts) {
+            $count = $_;
+            #print "Count: ".$count." # ".$filerCounts{$count}."\n";
+            undef @filerIds;
+            for ($idx = 0; defined($filers{$count}[$idx]); $idx++) {
+                push @filerIds, $filers{$count}[$idx];
+                if ($idx > 0 && ($idx % 1000) == 0) {
+                    print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
+                    undef @filerIds;
+                }
+            }
+            if (defined(@filerIds)) {
+                print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
+            }
+        }
+        print "\n";
+
+        close M;
+    }
+
+    open M, $pipeDBv;
+
+    print M "update filers_counted set filer_sum = ".(join ' + ', sort keys %filersTables).";\n";
+
+    close M;
+}
+
+print "Done.\n";
+
+exit(0);

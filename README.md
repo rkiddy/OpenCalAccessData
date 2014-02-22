@@ -1,4 +1,8 @@
 
+The OpenCalAccessData project is an attempt to publish information about the CalAccess data dump that is
+released by the California Secretary of State's office, Political Reform Division and publish "fixes" to
+data so that others might find this information more valuable.
+
 The zip file at http://campaignfinance.cdn.sos.ca.gov/dbwebexport.zip contains two zip files, one with a
 "doc_" prefix and the other with a "db_" prefix. The doc file has not changed since I have been tracking
 this (2013/10/28). The db file changes every day, but I am not sure what time it gets updated, if there
@@ -14,8 +18,8 @@ And, if the SoS keeps track of errors reported in the data, they do not let anyo
 They will hear you if you report something and thank you for the information, but there is nothing that
 they will do about it. Or, if there is, there is nothing they will be able to tell you about what they can do.
 
-So, if someone says they live in "Oatland, CA", or say they have a 2 digit phone number, there is nothing
-the SoS can do to correct the data.
+So, if someone says they live in "Oatland, CA", or their city is "Fresno CA" (while leaving the state field
+blank), or say they have a 2 digit phone number, there is nothing the SoS can do to correct the data.
 
 But we, as members of the public, can see this data and I can set up a system to track errors in it so that
 we know about them and can see the corrected data. I have found errors in the data and, at times, I have ways
@@ -40,15 +44,54 @@ The intention here is that a new copy of the data can be downloaded from the SoS
 data can be integrated into the existing data. But one also should be able to re-create the database at any time
 from the files.
 
-The scripts to do this are as follows:
+The scripts to do this are as follows. Do not judge me harshly by these scripts. Unless I am trying to do
+something else, I write old-school perl. If anyone wants to demonstrate a better way to script, please feel free
+to do so. I would love to hear from you.
+
+---------------
+
+00_fix_dload_files
+01_import
+02_create
+03_fix_dates
+04_mark_high_amends
+05_check_filed_counts
+06_drop_cds
+09_move_database
+0a_test_data
+check_filing_id
+check_states
+options.pl
+
+----------------
+
+These scripts rely on a file, ~/.opencalaccess, in which you can declare ivars for dependencies in your local
+environment. My copy of this file contains:
+
+     # Defining executable paths here so that this can run on different platforms.
+     #
+     mysql /usr/bin/mysql
+     head /usr/bin/head
+     cat /bin/cat
+     
+     # Perhaps host-specific file system paths
+     #
+     tmpDir /tmp
+     projectDir /home/ray/Projects
+     dataDir /home/ray/Projects/OpenCalAccessData
+     
+     # user-specific information
+     #
+     dbName calaccess
+     dbUser ray
+     dbPwd zekretWrd
 
 * 00_fix_dload_files
 
-A newer script. Trying to correct problems in the data that break or bother the import. There are two kinds of
-files. With the first set of files, I can identify the lines that are new by some set of column values. With
-those, I only need to scan for problems in new data. With some of the files, I need to replace the entire file
-because I cannot tell which lines are updated or added. For these files, I need to re-fix all the problems I
-see in the files.
+A newer script. Trying to correct problems in the data that break or bother the import. As I am developing
+better ways to correct the errors in the files, the code gets more concise. The good thing is that once an
+error appears in the files, it will probably stay there forever. The SoS cannot correct data as filed. There
+are some files they produce and so they can fix them. It is not clear that they feel any need to do so.
 
 * 01_import
 
@@ -59,11 +102,11 @@ tabs are found and throw off the column count, need to be fixed.
 A new pk value is added to the beginning of each line in the import file.
 
 The raw tables have the suffix "_cd" on their names. After the data is transferred to the cleaned-up tables, the
-"cd" tables could be deleted, but this is not being done now.
+"cd" tables can get dropped later.
 
 This script will always drop and create the cd table or tables.
 
-* 02_create_final
+* 02_create
 
 This script pulls the data from the "cd" table or tables and puts it into properly defined tables. See the
 "tableCols.txt" file for the table column definitions. This file is used by many of the scripts.
@@ -85,16 +128,7 @@ but because columns have been transposed, or extra tabs are found, or tabs are m
 There is a lot of data validation still to do after this step, but most of that has to do with the meaning of
 the data values and not the structure.
 
-* 03_set_empty_to_null
-
-For some reason, you _cannot_ get the import process in MySQL to put in NULL values when the contents of
-a TSV file are blank. It insists on putting them in as "". This script fixes that. It probably need not be run
-3rd. The applications can deal with it if this is not run and it takes a long time to run, as most of the
-columns it updates are not indexed.
-
-This script can be run at any time and it does not damage any of the data.
-
-* 04_fix_dates
+* 03_fix_dates
 
 The SoS database stores dates as "12/29/2000 12:00:00 AM". This form is used even when the date is really
 just a date and does not have a time associated with it. I turn these into MySQL-compatible strings, so that
@@ -104,48 +138,34 @@ could be done if desired.
 This script can be run at any time and it does not damage any of the data. It matches only on date or datetime
 values in the old format and does not update any data that is in the correct format.
 
-* 05_mark_high_amends
+If this script has already been run, it does not damage corrected rows. It can be run multiple times without
+worry.
 
+* 04_mark_high_amends
 
-* 06_check_date_convs
+* 05_check_filed_counts
 
-This scripts finds all of the date and datetime columns in the tables and adds a copy of the column using the
-date or datetime type. If there is a problem with the data, then this update will give a warning or error.
+Two extra tables are produced, the filings_counted table and the filers_counted table. This table tells us,
+for a particular filing or filer, how many rows appear in other tables. For example, a Late Contribution form
+will have a cvr_campaign_disclosure row, some number of s498 rows, and some other rows. Approximately
+1 million of the 1.5 million filings in the system have no rows at all. They are filed as paper only, but
+the SoS adds the information about them into the filer_filings table.
 
-This script can be run at any time and it does not damage any of the data.
-
-* 07_check_filed_counts
-
-This script creates two new tables, one to keep track of table counts for filing_id values and one to keep
-track of filer_id values. There is a row for each filing_id or filer_id. In that row are the counts of the
-rows in other tables associated with that filing_id or filer_id.
-
-The new tables created are the "filers_counted" and "filings_counted" tables.
+TODO: These filings_counted should include the form_id of the filing. It would be very helpful.
 
 This script can be run at any time and it does not damage any of the data.
 
-* EXTRA TABLES
+* 06_drop_cds
 
-Some tables are created by other processes using other tools. These may be experimental efforts and should
-not be regarded as reliable in any way unless there is supporting documentation which states that the data
-is reliable for some purpose.
+This script will drop the tables produced by the 01_import script. They can be re-created at will.
 
-- import_dates
+* 09_move_database
 
-This table is used to track how many records exist in what tables after each import from the SoS web site has
-occurred.
+This script takes two database names as parameters. It creates the target database if necessary and
+moves the tables from the source database, the 1st parameter, to the target database, the 2nd parameter.
 
-- people, people_info and people_join
+* 0a_test_data
 
-The "people" table has only a pk and a canonical name.
+TBD: Tests things to see if they are correct, whatever that means.
 
-The "people_join" table links a person to the filings in which they appear. Foreign keys in the people join
-table need to specify which table the person is in, the keys that uniquely identify a record, such as
-filing_id-amend_id-line_item-form_type, and the role of that person, such as "enty" or "treas" or "cand".
-
-The "people_info" table relates one of these people to a random bit of information, such as a link to a
-news article about them, or some fact that was derived from some source outside of this system.
-
-Efforts to actually identify people and connect them definitively to their records are underway, but it
-will be a long row to hoe. This will not be possible to do reliably for some time.
 

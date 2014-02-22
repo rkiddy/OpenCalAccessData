@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+
+require "scripts/options.pl";
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-v") { $verbose = 1; }
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+}
+
+if ( ! defined($importDate)) {
+    print "\nPlease give me an import date as a parameter.\n\n";
+    exit(0);
+}
+
+$cmd = "echo \"show tables;\" | ".$myQ."_".$importDate." | grep '_cd'";
+@tables = `$cmd`;
+chomp(@tables);
+
+open M, "| ".$myV."_".$importDate;
+
+foreach (@tables) {
+    print M "drop table ".$_.";\n";
+}
+
+close M;
+
+print "\nDone.\n\n";
+
+exit(0);

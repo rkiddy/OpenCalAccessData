@@ -1,24 +1,22 @@
 #!/usr/bin/perl
 
-if ( ! -f "scripts/options.pl" ) { 
-    print "\nPlease cd to the correct directory. It is assumed you are in a data directory next to a OpenCalAccess directory.\n\n";
-    exit(1);
-}
+require "scripts/options.pl";
 
-require "../OpenCalAccess/options.pl";
-
-if (scalar(@ARGV) == 0) { print "\nusage: ./05_fix_dates [ -dryrun ] [ -all ] [ -no_create ] [ <files> ]\n\n"; exit(0); }
-
-@sql = split '\n', $sql;
-
-foreach (@ARGV) {
-    $arg = $_;
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
 
     if ($arg eq "-all") { $allTables = 1; }
 
     if ($arg eq "-dryrun") { $dryrun = 1; }
 
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+
     if ($arg !~ /^\-/) { $tables{$arg} = 1; }
+}
+
+if (scalar(@ARGV) == 0 || ! defined($importDate) || ( ! defined($allTables) && scalar(%tables) == 0)) {
+    print "\nusage: ./05_fix_dates -date <YYYYMMDD> [ -dryrun ] ( -all | <files> )\n\n";
+    exit(0);
 }
 
 open T, "tableCols.txt";
@@ -26,11 +24,11 @@ while (<T>) {
     chomp;
     $line = $_;
 
-    if ($last eq "" && $line ne "") {
+    if ($line ne "" && $line !~ / /) {
         $tableName = $line;
 
         $sql = "show index from ".$tableName.";";
-        $cmd = "echo \"".$sql."\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+        $cmd = "echo \"".$sql."\" | ".$myQ."_".$importDate;
         foreach (`$cmd`) {
             $row = $_;
             @p = split '\t', $row;
@@ -47,36 +45,39 @@ while (<T>) {
 
             print "fix date: table: \"".$tableName."\", column: \"".$column."\"\n";
 
-            if ( ! defined($indexes{$tableName})) {
-                $sql = "show index from cvr_campaign_disclosure;";
-                $cmd = "echo \"".$sql."\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
-                foreach (`$cmd`) {
-                    @p = split '\t', $_;
-                    $indexes{$tableName}{$p[4]} = 1;
-                }
+            if ( ! defined($alreadyCreated{$tableName."_2"})) {
+
+                open M, "| ".$myV."_".$importDate;
+                print M "create table ".$tableName."_2 (pk int primary key, ".$column." date);";
+
+                $cmd = "echo \"select max(pk) from ".$tableName.";\" | ".$myQ."_".$importDate;
+                $pk = `$cmd`;
+                chomp($pk);
+
+                print "table: ".$tableName.", max pk = ".$pk."\n";
+
+                $alreadyCreated{$tableName."_2"} = 1;
+
+            } else {
+                push @sql, "alter table ".$tableName."_2 add column ".$column." date;";
+                push @sql, "update ".$tableName."_2 set ".$column." = NULL;";
             }
 
-            if ( ! defined($indexes{$tableName}{$column})) {
-                push @sql, "alter table ".$tableName." add index(".$column."(10));";
+            for ($idx = 0; $idx < $pk; $idx = $idx + 10000) {
+
+                push @sql, "update ".$tableName." t1, ".$tableName."_2 t2 ".
+                           "set t2.".$column." = cast(str_to_date(t1.".$column.", '%m/%d/%Y %r') as date) ".
+                           "where t1.pk = t2.pk and t1.pk >= ".$idx." and t1.pk < ".($idx+10000).";";
+
+                push @sql, "update ".$tableName." t1, ".$tableName."_2 t2 ".
+                           "set t1.".$column." = t2.".$column." ".
+                           "where t1.pk = t2.pk and t2.".$column." is not NULL and ".
+                           "t1.pk >= ".$idx." and t1.pk < ".($idx+10000).";";
             }
-
-            push @sql, "update ".$tableName." set ".$column." = ".
-                    "concat(substr(".$column.",7,4),\"-\",substr(".$column.",1,2),\"-\",substr(".$column.",4,2)) ".
-                    "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/.*';";
-
-            push @sql, "update ".$tableName." set ".$column." = ".
-                    "concat(substr(".$column.",6,4),\"-0\",substr(".$column.",1,1),\"-\",substr(".$column.",3,2)) ".
-                    "where ".$column." rlike '^[0-9]/[0-9][0-9]/.*';";
-
-            push @sql, "update ".$tableName." set ".$column." = ".
-                    "concat(substr(".$column.",6,4),\"-\",substr(".$column.",1,2),\"-0\",substr(".$column.",4,1)) ".
-                    "where ".$column." rlike '^[0-9][0-9]/[0-9]/.*';";
-
-            push @sql, "update ".$tableName." set ".$column." = ".
-                    "concat(substr(".$column.",5,4),\"-0\",substr(".$column.",1,1),\"-0\",substr(".$column.",3,1)) ".
-                    "where ".$column." rlike '^[0-9]/[0-9]/.*';";
 
             push @sql, "update ".$tableName." set ".$column." = NULL where ".$column." = '0000-00-00';";
+
+            push @drops, "drop table if exists ".$tableName."_2;";
 
             push @counts, "select count(*) from ".$tableName." where ".$column." not rlike '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]';";
         }
@@ -93,7 +94,7 @@ while (<T>) {
 
             if ( ! defined($indexes{$tableName})) {
                 $sql = "show index from cvr_campaign_disclosure;";
-                $cmd = "echo \"".$sql."\" | ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names ".&option("dbName");
+                $cmd = "echo \"".$sql."\" | ".$myQ."_".$importDate;
                 foreach (`$cmd`) {
                     @p = split '\t', $_;
                     $indexes{$tableName}{$p[4]} = 1;
@@ -123,7 +124,7 @@ while (<T>) {
             push @sql, "update ".$tableName.
                     " set ".$column." = concat(substr(".$column.",6,4), \"-0\", substr(".$column.",1,1), \"-\", substr(".$column.",3,2), substr(".$column.", 10)) ".
                     "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
-
+    
             push @sql, "update ".$tableName.
                     " set ".$column." = concat(substr(".$column.",6,4), \"-0\", substr(".$column.",1,1), \"-\", substr(".$column.",3,2), \" 0\", substr(".$column.", 11)) ".
                     "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';";
@@ -164,7 +165,7 @@ while (<T>) {
 }
 
 if ( ! defined($dryrun)) {
-    open M, "| ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+    open M, "| ".$myV."_".$importDate;
 } else {
     open M, "| cat -";
 }
@@ -173,8 +174,9 @@ foreach (@sql) { print M $_."\n"; }
 
 close M;
 
-open M, "| ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv ".&option("dbName");
+open M, "| ".$myV."_".$importDate;
 
+foreach (@drops) { print M $_."\n"; }
 foreach (@counts) { print M $_."\n"; }
 
 close M;
