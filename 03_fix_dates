@@ -48,7 +48,10 @@ while (<T>) {
             if ( ! defined($alreadyCreated{$tableName."_2"})) {
 
                 open M, "| ".$myV."_".$importDate;
-                print M "create table ".$tableName."_2 (pk int primary key, ".$column." date);";
+                print M "create table ".$tableName."_2 (pk int primary key, ".$column." date);\n";
+
+                print M "insert into ".$tableName."_2 (pk) select pk from ".$tableName.";\n";
+                close M;
 
                 $cmd = "echo \"select max(pk) from ".$tableName.";\" | ".$myQ."_".$importDate;
                 $pk = `$cmd`;
@@ -79,7 +82,7 @@ while (<T>) {
 
             push @drops, "drop table if exists ".$tableName."_2;";
 
-            push @counts, "select count(*) from ".$tableName." where ".$column." not rlike '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]';";
+            push @counts, "select count(*) from ".$tableName." where ".$column." != '' and ".$column." not rlike '^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]';";
         }
     }
 
