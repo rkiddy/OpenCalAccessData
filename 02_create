@@ -31,6 +31,8 @@ if (defined($allTables) && (scalar(keys %tables)) > 0) {
     exit(0);
 }
 
+$inc = 10000;
+
 open T, "scripts/tableCols.txt";
 while (<T>) {
     chomp;
@@ -68,6 +70,10 @@ print M "set max_error_count = 65535;\n";
 
 foreach (sort keys %tables) {
     $table = $_;
+
+    $cmd = "echo \"select max(pk) from ".$table."_cd;\" | ".$myQ."_".$importDate;
+    $pk = `$cmd`;
+    chomp($pk);
 
     print M "drop table if exists ".$table.";\n";
 
@@ -120,13 +126,17 @@ foreach (sort keys %tables) {
         $idx++;
     }
 
-    print M "insert into ".$table." (\n";
-    print M (join ",\n", @cols)."\n";
-    print M ") select \n";
-    print M (join ",\n", @cols)."\n";
-    print M "from ".$table."_cd;\n";
+    for ($idx = 0; $idx <= $pk; $idx = $idx + $inc) {
 
-    if (defined($verbose)) { print M "show warnings;\n"; }
+        print M "insert into ".$table." (\n";
+        print M (join ",\n", @cols)."\n";
+        print M ") select \n";
+        print M (join ",\n", @cols)."\n";
+        print M "from ".$table."_cd ";
+        print M "where pk > ".$idx." and pk <= ".($idx+$inc).";\n";
+
+        if (defined($verbose)) { print M "show warnings;\n"; }
+    }
 }
 
 close M;
