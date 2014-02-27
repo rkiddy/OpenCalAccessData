@@ -7,6 +7,8 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-v") { $verbose = 1; }
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+
+    if ($arg eq "-suffix") { $suffix = $ARGV[$idx+1]; $idx++; next; }
 }
 
 if ( ! defined($importDate)) {
@@ -14,7 +16,9 @@ if ( ! defined($importDate)) {
     exit(0);
 }
 
-$cmd = "echo \"show tables;\" | ".$myQ."_".$importDate." | grep '_cd'";
+if ( ! defined($suffix)) { $suffix = "_cd"; }
+
+$cmd = "echo \"show tables;\" | ".$myQ."_".$importDate." | grep '".$suffix."'";
 @tables = `$cmd`;
 chomp(@tables);
 
