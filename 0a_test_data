@@ -1,3 +1,77 @@
 #!/usr/bin/perl
 
+require "scripts/options.pl";
 
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-v") { $verbose = 1; }
+    if ($arg eq "-vv") { $verbose = 2; }
+
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; Next; }
+}
+
+if ( ! defined($importDate)) { print "\nusage: ./0a_test_data -date <YYYYMMDD> [ -v ]\n\n"; exit(0); }
+ 
+# TODO Replace with sub like "columnsOfType(type)".
+
+undef @tableCols;
+
+open T, "scripts/tableCols.txt";
+while (<T>) {
+    chomp;
+    $line = $_;
+
+    if ($line ne "" && $line !~ / /) {
+        $table = $line;
+    }
+
+    if ($line =~ / /) {
+        $column = $`;
+        $colType = $';
+
+        if ($colType eq	"date") { push @tableCols, $table."\t".$column; }
+    }
+}
+
+close T;
+
+undef @errs;
+
+print "\nCheck format and correctness of date columns... ";
+
+if (defined($verbose)) { print "\n"; }
+
+foreach (@tableCols) {
+
+    ($table, $col) = split '\t', $_;
+
+    $cmd = "echo \"select count(*) from ".$table." ".
+           "where ".$col." != '' and ".$col." not rlike '^[0-9]{4}\\-[0-9]{2}\\-[0-9]{2}\$';\" ".
+           "| ".$myQ."_".$importDate;
+
+    if ($verbose > 1) { print "cmd: \"".$cmd."\"\n"; }
+
+    $count = `$cmd`;
+    chomp($count);
+
+    if ($count > 0) {
+        $badDateCols{$table."->".$col} = $count;
+        if (defined($verbose)) { print "badDateCol: \"".$table."->".$col."\" -> ".$count."\n"; }
+        push @errs, "     badDateCol: \"".$table."->".$col."\" -> ".$count."\n";
+    }
+    if (defined($verbose) && $count == 0) {
+        if (defined($verbose)) { print "badDateCol: \"".$table."->".$col."\" -> ".$count."\n"; }
+    }
+}
+
+if (scalar(@errs) == 0) {
+    print "No errors\n";
+} else {
+    print "ERRORS:\n";
+    foreach (@errs) { print $_; }
+}
+
+print "\n";
+
+exit(0);
