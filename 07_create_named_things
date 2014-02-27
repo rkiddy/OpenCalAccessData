@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+
+require "scripts/options.pl";
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-v") { $verbose = 1; }
+
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
+
+    if ($arg eq "-dryrun") { $dryRun = 1; }
+
+    if ($arg eq "-inc") { $inc = $ARGV[$idx+1]; $idx++; next; }
+
+    if ($arg eq "-droppy") { $droppy = 1; }
+
+    if (arg eq "-all") { $allTables = 1; }
+
+    if ($arg !~ /\-/) { $tables{$arg} = 1; }
+}
+
+$usage = "\nusage: ./07_create_named_things -date <YYYYMMDD> [ -start <table> ]\n\n";
+
+if ( ! defined($importDate)) { print $usage; exit(0); }
+
+if ( ! defined($allTables) && scalar(%tables) == 0) { print $usage; exit(0); }
+
+if ( ! defined($inc)) { $inc = 1000000; }
+
+if ( ! defined($dryRun)) {
+    open M, "| ".$myV."_".$importDate;
+} else {
+    open M, "| cat -";
+}
+
+if ( ! defined($startWith)) {
+
+#    print M "drop table if exists named_things;\n";
+#
+#    print M "create table named_things (".
+#                "table_name varchar(40), ".
+#                "table_pk int, ".
+#                "name_type varchar(6), ".
+#                "naml varchar(200), ".
+#                "namf varchar(45), ".
+#                "namt varchar(10), ".
+#                "nams varchar(10), ".
+#                "id varchar(9));\n";
+#
+#    print M "alter table named_things add primary key(table_name, table_pk, name_type);\n";
+}
+
+open T, "scripts/tableCols.txt";
+
+$sql = 1;
+
+while (<T>) {
+    chomp;
+    $line = $_;
+
+    if ($line ne "" && $line !~ / /) {
+        $tableName = $line;
+
+        if (defined($allTables) || defined($tables{$tableName})) {
+            $cmd = "echo \"select max(pk) from ".$tableName.";\" | ".$myQ."_".$importDate;
+            $pk = `$cmd`;
+            chomp($pk);
+        }
+    }
+
+    if ($line ne "" && $line =~ /_naml /) {
+        $type = $`;
+
+        if (defined($allTables) || defined($tables{$tableName})) {
+
+            for ($lowPk = 0; $lowPk < $pk; $lowPk = $lowPk + $inc) {
+
+                print M "replace into named_things ".
+                            "(table_name, table_pk, name_type, naml, namf, namt, nams) ".
+                            "select '".$tableName."', pk, '".$type."', ".
+                                    $type."_naml, ".$type."_namf, ".$type."_namt, ".$type."_nams from ".$tableName." ".
+                            "where (".$type."_naml != '' or ".$type."_namf != '' or ".$type."_namt != '' or ".$type."_nams != '') ".
+                                    "and pk >= ".$lowPk." and pk < ".($lowPk + $inc).";\n";
+
+                if (defined($droppy) && ($sql % 25) == 0) {
+
+                    close M;
+
+                    if ( ! defined($dryRun)) {
+                        open M, "| ".$myV."_".$importDate;
+                    } else {
+                        open M, "| cat -";
+                    }
+                }
+
+                $sql++;
+            }
+        }
+    }
+}
+
+close M;
+
+exit(0);
