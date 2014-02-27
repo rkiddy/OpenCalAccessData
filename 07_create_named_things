@@ -15,12 +15,12 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-droppy") { $droppy = 1; }
 
-    if (arg eq "-all") { $allTables = 1; }
+    if ($arg eq "-all") { $allTables = 1; }
 
     if ($arg !~ /\-/) { $tables{$arg} = 1; }
 }
 
-$usage = "\nusage: ./07_create_named_things -date <YYYYMMDD> [ -start <table> ]\n\n";
+$usage = "\nusage: ./07_create_named_things -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <inrement> ] ( -all | <tables> )\n\n";
 
 if ( ! defined($importDate)) { print $usage; exit(0); }
 
