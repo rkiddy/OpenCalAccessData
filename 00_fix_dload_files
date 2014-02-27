@@ -1,11 +1,9 @@
 #!/usr/bin/perl
 
-
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
     if ($arg eq "-all") { $allFiles = 1; }
-    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
     if ($arg eq "-v") { $verbose = 1; }
     if ($arg eq "-vv") { $verbose = 2; }
 
@@ -16,7 +14,7 @@ $date = `date '+%Y%m%d_%H%M%S'`;
 chomp($date);
 
 if ( ! defined($allFiles) && scalar(keys %files) == 0) {
-    print "\nusage: ./00_fix_dload_files -date <YYYYMMDD> ( -all | <files> )\n\n";
+    print "\nusage: ./00_fix_dload_files ( -all | <files> )\n\n";
     exit(0);
 }
 
@@ -25,7 +23,7 @@ if (defined($verbose) && scalar(%files) > 0) {
 }
 
 if (defined($allFiles)) {
-    $cmd = "( cd data_".$importDate."/Data ; /bin/ls *_CD.TSV )";
+    $cmd = "/bin/ls *_CD.TSV";
     @files = `$cmd`;
     chomp(@files);
 
@@ -89,7 +87,7 @@ sub add_field {
 
 sub compare_results {
 
-    $cmd = "diff ".$file." ".$outFile;
+    $cmd = &option("diff")." -y --suppress-common-lines ".$file." ".$outFile;
 
     @changes = `$cmd`;
 
@@ -233,8 +231,6 @@ if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
 
-    $changed = 0;
-
     print "\nfixing ".$file."...";
 
     open F1, $file;
@@ -253,14 +249,13 @@ if (defined($allFiles) || defined($files{$file})) {
                 $p[18] = "CA";
                 $p[19] = "94553";
                 $line = join "\t", @p;
-                $changed++;
             }
         }
 
         # Oakland is in CA and not in "AC".
         #
-        if ($line =~ /^1212884\t/ && $line =~ /\tOakland\tAC\t/) { $line =~ s/\tOakland\tAC\t/\tOakland\tCA\t/; $changed++; }
-        if ($line =~ /^1218926\t/ && $line =~ /\tOakland\tAC\t/) { $line =~ s/\tOakland\tAC\t/\tOakland\tCA\t/; $changed++; }
+        if ($line =~ /^1212884\t/ && $line =~ /\tOakland\tAC\t/) { $line =~ s/\tOakland\tAC\t/\tOakland\tCA\t/; }
+        if ($line =~ /^1218926\t/ && $line =~ /\tOakland\tAC\t/) { $line =~ s/\tOakland\tAC\t/\tOakland\tCA\t/; }
 
         print F2 $line;
     }
@@ -319,8 +314,6 @@ if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
 
-    $changed = 0;
-
     print "\nfixing ".$file."...";
 
     open F1, $file;
@@ -348,8 +341,6 @@ if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
 
-    $changed = 0;
-
     print "\nfixing ".$file."...";
 
     open F1, $file;
@@ -374,7 +365,6 @@ if (defined($allFiles) || defined($files{$file})) {
             @p = &remove_field(7, @p);
             @p = &add_empty_field_at_end(@p);
             $line = join "\t", @p;
-            $changed++;
         }
 
         # Row of data chopped into two.
@@ -389,7 +379,6 @@ if (defined($allFiles) || defined($files{$file})) {
             shift @nextP;
             push @p, @nextP;
             $line = join "\t", @p;
-            $changed++;
         }
 
         print F2 $line;
@@ -481,8 +470,6 @@ if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
 
-    $changed = 0;
-
     print "\nfixing ".$file."...";
 
     open F1, $file;
@@ -550,8 +537,6 @@ $file = "FILER_TO_FILER_TYPE_CD.TSV";
 if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
-
-    $changed = 0;
 
     print "\nfixing ".$file."...";
 
@@ -677,6 +662,49 @@ $file = "LEMP_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
+    $outFile = $file."_FIXED";
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        #$line =~ s/\\\t/\t/g;
+
+        @p = split '\t', $line;
+        
+        if ($p[5] =~ /^\s*$/ && $p[6] eq "C21366") {
+            @p = &remove_field(5, @p);
+            @p = &add_empty_field_at_end(@p);
+            $line = join "\t", @p;
+        }
+
+        if ($line =~ /^1224366\t/ || $line =~ /^1385955\t/) {
+
+            $line =~ s/\t San Joaquin Air Pollution Control District/ San Joaquin Air Pollution Control District/;
+            $line =~ s/\t California Environmental Protection Agency/ California Environmental Protection Agency/;
+            $line =~ s/California Environmental Protection Agency /California Environmental Protection Agency/g;
+
+            # Un-printable character, ^U
+            #
+            $line =~ s/All issues at the Air Board including: .\t/All issues at the Air Board including: /;
+        }
+
+        if ($line =~ /^1718987\t/ && $p[16] =~ /^\s*$/) {
+            @p = &remove_field(16, @p);
+            $line = join "\t", @p;
+        }
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
 }
 
 # LEXP_CD.TSV
@@ -685,6 +713,58 @@ $file = "LEXP_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
+    $outFile = $file."_FIXED";
+
+    print "\nfixing ".$file."...";
+
+    open F1, $file;
+    open F2, "> ".$outFile;
+
+    while (<F1>) {
+        $line = $_;
+
+        @p = split '\t', $line;
+
+        if ($line =~ /^1504379\t0\t11\t/) {
+            @p = &remove_field(18, @p);
+            @p = &remove_field(18, @p);
+            $line = join "\t", @p; 
+        }
+
+        if ($line =~ /^1504379\t0\t12\t/) {
+            @p = &remove_field(17, @p);
+            @p = &remove_field(17, @p);
+            @p = &remove_field(18, @p);
+            @p = &remove_field(18, @p);
+            @p = &add_empty_field_at_end(@p);
+            $line = join "\t", @p;
+        }
+
+        if ($line =~ /^1504379\t0\t13\t/) {
+            @p = &remove_field(18, @p);
+            @p = &remove_field(18, @p);
+            @p = &remove_field(18, @p);
+            @p = &remove_field(18, @p);
+            $line = join "\t", @p;
+        }
+
+        if ($line =~ /^1818375\t/) {
+            $line =~ s/Donor:\s*\t\s*Environmental Defense Fund, Incorporated\s*\//Donor: Environmental Defense Fund, Incorporated/
+        }
+
+        if ($line =~ /^931805\t/ && scalar(@p) == 25) {
+            $p[16] = $p[16]." ".$p[17];
+            @p = &remove_field(17, @p);
+            $line = join "\t", @p;
+        }
+
+        print F2 $line;
+    }
+
+    close F1;
+    close F2;
+
+    &compare_results();
 }
 
 # LOAN_CD.TSV
@@ -710,8 +790,6 @@ $file = "LOBBYING_CHG_LOG_CD.TSV";
 if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
-
-    $changed = 0;
 
     print "\nfixing ".$file."...";
 
@@ -900,8 +978,6 @@ $file = "NAMES_CD.TSV";
 if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
-
-    $changed = 0;
 
     print "\nfixing ".$file."...";
 
@@ -1096,8 +1172,6 @@ if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
 
-    $changed = 0;
-
     print "\nfixing ".$file."...";
 
     open F1, $file;
@@ -1197,8 +1271,6 @@ $file = "TEXT_MEMO_CD.TSV";
 if (defined($allFiles) || defined($files{$file})) {
 
     $outFile = $file."_FIXED";
-
-    $changed = 0;
 
     print "\nfixing ".$file."...";
 
