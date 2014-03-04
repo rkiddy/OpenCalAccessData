@@ -30,7 +30,7 @@ if ( ! defined($importDate)) {
 }
 
 if (defined($allFiles)) {
-    $cmd = "( cd ".&option("dataDir")." ; /bin/ls -1 *_CD.TSV )";
+    $cmd = "/bin/ls -1 *_CD.TSV";
     @files = `$cmd`;
     chomp(@files);
 }
@@ -40,9 +40,11 @@ if ( ! defined($allFiles) && scalar(@files) == 0) {
     exit(0);
 }
 
+if (&db_exists(&option("dbName")."_".$importDate) == 0) {
 open M, "| ".$myNo;
-print M "create database ".&option("dbName")."_".$importDate.";\n";
+print "create database ".&option("dbName")."_".$importDate.";\n";
 close M;
+}
 
 open M, "| ".$myV."_".$importDate;
 
@@ -107,6 +109,17 @@ foreach (@files) {
     while (<SQL_IN>) {
         $line = $_;
         $line =~ s/ *\t/\t/g;
+
+        while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}) 12:00:00 AM\t/) {
+            $pre = $`;
+            $post = $';
+            $month = $1;
+            $day = $2;
+            $year = $3;
+            if ($month < 10) { $month = "0".$month; }
+            if ($day < 10) { $day = "0".$day; }
+            $line = $pre."\t".$year."-".$month."-".$day."\t".$post;
+        }
         print SQL_OUT $pk."\t".$line;
         $pk++;
     }
