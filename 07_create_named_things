@@ -20,9 +20,14 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg !~ /\-/) { $tables{$arg} = 1; }
 }
 
-$usage = "\nusage: ./07_create_named_things -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <inrement> ] ( -all | <tables> )\n\n";
+$usage = "\nusage: ./07_create_named_things -date <YYYYMMDD> [ -start <table> ]\n\n";
 
 if ( ! defined($importDate)) { print $usage; exit(0); }
+
+if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
+    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
+    exit(1);
+}
 
 if ( ! defined($allTables) && scalar(%tables) == 0) { print $usage; exit(0); }
 

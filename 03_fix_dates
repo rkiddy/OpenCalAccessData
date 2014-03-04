@@ -19,6 +19,11 @@ if (scalar(@ARGV) == 0 || ! defined($importDate) || ( ! defined($allTables) && s
     exit(0);
 }
 
+if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
+    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
+    exit(1);
+}
+
 open T, "scripts/tableCols.txt";
 while (<T>) {
     chomp;

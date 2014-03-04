@@ -13,6 +13,11 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
 if ( ! defined($importDate)) { print "\nusage: ./0a_test_data -date <YYYYMMDD> [ -v ]\n\n"; exit(0); }
  
+if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
+    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
+    exit(1);
+}
+
 # TODO Replace with sub like "columnsOfType(type)".
 
 undef @tableCols;

@@ -20,6 +20,11 @@ if ( ! defined($importDate)) {
     exit(0);
 }
 
+if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
+    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
+    exit(1);
+}
+
 if ( ! defined($filingOnly) && ! defined($filerOnly)) { $bothTables = 1; }
 
 $myV = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv --force ".&option("dbName")."_".$importDate;

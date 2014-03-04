@@ -21,6 +21,11 @@ if (scalar(@ARGV) == 0 || ! defined($importDate)) {
     exit(0);
 }
 
+if (&db_exists(&option("dbName")."_".$importDate) != 1) {
+    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
+    exit(1);
+}
+
 if ( ! defined($allTables) && (scalar(keys %tables)) == 0) {
     print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] ( -all | <tables> ) - please use -all or a list of tables\n\n";
     exit(0);
