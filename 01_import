@@ -65,7 +65,7 @@ foreach (@files) {
 
      print M "-- table: ".$table."\n";
 
-     $cmd = &option("head")." -1 ".&option("dataDir")."/".$file;
+     $cmd = &option("head")." -1 ".$file;
      $topLine = `$cmd`;
      chomp($topLine);
 
@@ -110,6 +110,8 @@ foreach (@files) {
         $line = $_;
         $line =~ s/ *\t/\t/g;
 
+        # This will handle the date columns.
+        #
         while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}) 12:00:00 AM\t/) {
             $pre = $`;
             $post = $';
@@ -120,6 +122,27 @@ foreach (@files) {
             if ($day < 10) { $day = "0".$day; }
             $line = $pre."\t".$year."-".$month."-".$day."\t".$post;
         }
+
+        # This will handle the datetime column in FILER_TO_FILER_TYPE.TSV, whyever it must be diferent.
+        #
+        while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2}) ([AP]M)\t/) {
+            $pre = $`;
+            $post = $';
+            $month = $1;
+            $day = $2;
+            $year = $3;
+            $hour = $4;
+            $minute = $5;
+            $second = $6;
+            $ampm = $7;
+            if ($month < 10) { $month = "0".$month; }
+            if ($day < 10) { $day = "0".$day; }
+            if ($hour < 10) { $hour = "0".$hour; }
+            if ($minute < 10) { $minute = "0".$minute; }
+            if ($second < 10) { $second = "0".$second; }
+            $line = $pre."\t".$year."-".$month."-".$day." ".$hour.":".$minute.":".$second." ".$ampm."\t".$post;
+        }
+
         print SQL_OUT $pk."\t".$line;
         $pk++;
     }
