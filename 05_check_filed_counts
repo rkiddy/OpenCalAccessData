@@ -7,9 +7,6 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-v") { $verbose = 1; }
     if ($arg eq "-dryrun") { $dryrun = 1; }
-    if ($arg eq "-initonly") { $initOnly = 1; }
-    if ($arg eq "-nodrop") { $noDrop = 1; }
-    if ($arg eq "-nofill") { $noFill = 1; }
     if ($arg eq "-filingonly") { $filingOnly = 1; }
     if ($arg eq "-fileronly") { $filerOnly = 1; }
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
@@ -27,15 +24,12 @@ if (&db_exists(&option("dbName")."_".$importDate) != 1) {
 
 if ( ! defined($filingOnly) && ! defined($filerOnly)) { $bothTables = 1; }
 
-$myV = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv --force ".&option("dbName")."_".$importDate;
-$myQ = &option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." --skip-column-names --force ".&option("dbName")."_".$importDate;
-
 if (defined($dryrun)) {
     $pipeDBv = "| cat -";
     $pipeDBq = "| cat -";
 } else {
-    $pipeDBv = "| ".$myV;
-    $pipeDBq = "| ".$myQ;
+    $pipeDBv = "| ".$myVF."_".$importDate;
+    $pipeDBq = "| ".$myQF."_".$importDate;
 }
 
 #
@@ -57,67 +51,60 @@ while (<F>) {
     }
 }
 
+# But we are not tracking the filings table itself as it adds nothing.
 #
-# Why the FUCK does the "filer_ethics_class" appear in the list of tables having a filing_id column?
-# And why did this seem to have two columns named "filer_id"?
-# What is wrong here?
-#
-delete $filingsTables{"filer_ethics_class"};
+delete $filingsTables{"filings"};
 
 #
-# create the tables, if we are going to do it.
+# create the tables.
 #
-if ( ! defined($noDrop)) {
 
-    open M, $pipeDBv;
+open M, $pipeDBv;
 
-    if (defined($bothTables) || defined($filingOnly)) {
-        print M "drop table if exists filings_counted;\n";
-        print M "create table filings_counted (\n";
-        print M "    filing_id int primary key,\n";
-        print M "    filing_type int,\n";
-        undef @sql;
-        foreach (sort keys %filingsTables) {
-            push @sql, "    ".$_." int default 0";
-        }
-        print M join (",\n", @sql);
-        print M "    filing_sum int default 0);\n";
+if (defined($bothTables) || defined($filingOnly)) {
+    print M "drop table if exists filings_counted;\n";
+    print M "create table filings_counted (\n";
+    print M "    filing_id int primary key,\n";
+    print M "    filing_type int,\n";
+    undef @sql;
+    foreach (sort keys %filingsTables) {
+        push @sql, "    ".$_." int default 0";
     }
+    print M join (",\n", @sql);
+    print M ",\n";
+    print M "    filing_sum int default 0);\n";
+}
 
-    if (defined($bothTables) || defined($filerOnly)) {
-        print M "drop table if exists filers_counted;\n";
-        print M "create table filers_counted (\n";
-        print M "    filer_id varchar(30) primary key,\n";
-        undef @sql;
-        foreach (sort keys %filersTables) {
-            push @sql, "    ".$_." int default 0";
-        }
-        print M join (",\n", @sql);
-        print M "    filer_sum int default 0);\n";
+if (defined($bothTables) || defined($filerOnly)) {
+    print M "drop table if exists filers_counted;\n";
+    print M "create table filers_counted (\n";
+    print M "    filer_id varchar(30) primary key,\n";
+    undef @sql;
+    foreach (sort keys %filersTables) {
+        push @sql, "    ".$_." int default 0";
     }
+    print M join (",\n", @sql);
+    print M ",\n";
+    print M "    filer_sum int default 0);\n";
 
     close M;
 }
 
-if (defined($initOnly)) { print "\n"; exit(0); }
+open M, $pipeDBv;
 
-if ( ! defined($noFill)) {
-    open M, $pipeDBv;
-
-    if (defined($bothTables) || defined($filingOnly)) {
-        foreach (sort keys %filingsTables) {
-            print M "insert ignore into filings_counted (filing_id) select filing_id from ".$_.";\n";
-        }
+if (defined($bothTables) || defined($filingOnly)) {
+    foreach (sort keys %filingsTables) {
+        print M "insert ignore into filings_counted (filing_id) select filing_id from ".$_.";\n";
     }
-
-    if (defined($bothTables) || defined($filerOnly)) {
-        foreach (sort keys %filersTables) {
-            print M "insert ignore into filers_counted (filer_id) select filer_id from ".$_.";\n";
-        }
-    }
-
-    close M;
 }
+
+if (defined($bothTables) || defined($filerOnly)) {
+    foreach (sort keys %filersTables) {
+        print M "insert ignore into filers_counted (filer_id) select filer_id from ".$_.";\n";
+    }
+}
+
+close M;
 
 if (defined($bothTables) || defined($filingOnly)) {
 
@@ -129,7 +116,7 @@ if (defined($bothTables) || defined($filingOnly)) {
         undef %filingCounts;
         undef %filings;
 
-        $cmd = "echo \"select filing_id, count(*) from ".$table." group by filing_id;\" | ".$myQ;
+        $cmd = "echo \"select filing_id, count(*) from ".$table." group by filing_id;\" | ".$myQF."_".$importDate;
         @ids = `$cmd`;
         chomp(@ids);
         #print "ids # ".scalar(@ids)."\n";
@@ -184,7 +171,7 @@ if (defined($bothTables) || defined($filerOnly)) {
         undef %filerCounts;
         undef %filers;
 
-        $cmd = "echo \"select filer_id, count(*) from ".$table." group by filer_id;\" | ".$myQ;
+        $cmd = "echo \"select filer_id, count(*) from ".$table." group by filer_id;\" | ".$myQF."_".$importDate;
         @ids = `$cmd`;
         chomp(@ids);
         #print "ids # ".scalar(@ids)."\n";
