@@ -13,8 +13,6 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-inc") { $inc = $ARGV[$idx+1]; $idx++; next; }
 
-    if ($arg eq "-droppy") { $droppy = 1; }
-
     if ($arg eq "-all") { $allTables = 1; }
 
     if ($arg !~ /\-/) { $tables{$arg} = 1; }
@@ -41,19 +39,19 @@ if ( ! defined($dryRun)) {
 
 if ( ! defined($startWith)) {
 
-#    print M "drop table if exists named_things;\n";
-#
-#    print M "create table named_things (".
-#                "table_name varchar(40), ".
-#                "table_pk int, ".
-#                "name_type varchar(6), ".
-#                "naml varchar(200), ".
-#                "namf varchar(45), ".
-#                "namt varchar(10), ".
-#                "nams varchar(10), ".
-#                "id varchar(9));\n";
-#
-#    print M "alter table named_things add primary key(table_name, table_pk, name_type);\n";
+    print M "drop table if exists named_things;\n";
+
+    print M "create table named_things (".
+                "table_name varchar(40), ".
+                "table_pk int, ".
+                "name_type varchar(6), ".
+                "naml varchar(200), ".
+                "namf varchar(45), ".
+                "namt varchar(10), ".
+                "nams varchar(10), ".
+                "id varchar(9));\n";
+
+    print M "alter table named_things add primary key(table_name, table_pk, name_type);\n";
 }
 
 open T, "scripts/tableCols.txt";
@@ -88,6 +86,8 @@ while (<T>) {
                             "where (".$type."_naml != '' or ".$type."_namf != '' or ".$type."_namt != '' or ".$type."_nams != '') ".
                                     "and pk >= ".$lowPk." and pk < ".($lowPk + $inc).";\n";
 
+                # I am not using the -droppy flag, so this may go away.
+                #
                 if (defined($droppy) && ($sql % 25) == 0) {
 
                     close M;
