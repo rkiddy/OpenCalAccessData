@@ -99,6 +99,7 @@ sub compare_results {
 
     if (scalar(@changes) == 0) {
         if (defined($verbose)) { print "\nNo changes, removing FIXED file.\n"; }
+        print "\n";
         unlink $outFile;
     } else {
         print "\nchanged ".scalar(@changes).", original data -> \"".$file."_ORIG_".$date."\"\n";
@@ -444,14 +445,23 @@ if (defined($allFiles) || defined($files{$file})) {
 
         @p = split '\t', $line;
 
-        if (scalar(@p) > 51) {
+        if (scalar(@p) > 52) {
+
            undef @next;
-           @nextHead = splice(@p, 0, 43);
-           @nextTail = split(@p, -8); 
-           $middle = join " ", splice(@p, 43, scalar(@p)-43-8);
-           push @next, @nextHead;
-           push @next, $middle;
-           push @next, @nextTail;
+
+           for ($idx = 0; $idx < 43; $idx++) { push @next, $p[$idx]; }
+
+           $len = scalar(@p) - 52 + 1;
+
+           $mid = join ' ', splice(@p, 43, $len);
+           $mid =~ s/  */ /g;
+
+           push @next, $mid;
+
+           for ($idx = scalar(@p) - 8; $idx < scalar(@p); $idx++) {
+               push @next, $p[$idx];
+           }
+
            @p = @next;
         }
 
