@@ -127,7 +127,9 @@ foreach (sort keys %tables) {
 
     $idx = 0;
     while (defined($columns{$table}[$idx])) {
-        push @cols, "    ".$columns{$table}[$idx];
+        if ($table ne "filer_filings" || $columns{$table}[$idx] ne "high_amend_id") {
+            push @cols, "    ".$columns{$table}[$idx];
+        }
         $idx++;
     }
 

@@ -25,11 +25,14 @@ if ( ! defined(%tables)) {
         chomp;
         $line = $_;
         if ($line ne "" && $line !~ / /) { $tName = $_; }
-        if ($line =~ /amend_id/) { $tables{$tName} = 1; }
+        if ($line =~ /^amend_id/) { $tables{$tName} = 1; }
     }
 }
 
 delete $tables{"filings"};
+
+print "%tables:\n";
+foreach (sort keys %tables) { print "    ".$_."\n"; }
 
 $cmd = "echo \"desc filer_filings;\" | ".$myQ."_".$importDate;
 @cols = `$cmd`;
@@ -40,7 +43,7 @@ foreach (@cols) {
 }
 
 if ( ! defined($foundHighAmend)) {
-    print "No high_amend_id column. Altering table...";
+    print "\nNo high_amend_id column. Altering table...";
     $cmd = "echo \"alter table filer_filings add column high_amend_id int after filing_id;\" | ".$myV."_".$importDate;
     print `$cmd`;
 }
@@ -50,7 +53,7 @@ open M, "| ".$myV."_".$importDate;
 foreach (sort keys %tables) {
     $table = $_;
 
-    print $table."...";
+    print "\n".$table."...";
 
     print M "update filer_filings f1, (select filing_id, max(amend_id) as max from ".$table." group by filing_id) as a1 ".
             "set f1.high_amend_id = a1.max where f1.filing_id = a1.filing_id and (f1.high_amend_id is NULL or f1.high_amend_id < a1.max);\n";
