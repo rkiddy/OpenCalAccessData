@@ -13,11 +13,13 @@ for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
 
+    if ($arg eq "-inc") { $inc = $ARGV[$idx+1]; $idx++; next; }
+
     if ($arg !~ /^\-/) { $tables{$arg} = 1; }
 }
 
 if (scalar(@ARGV) == 0 || ! defined($importDate)) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] ( -all | <tables> )\n";
+    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> )\n";
     exit(0);
 }
 
@@ -27,16 +29,16 @@ if (&db_exists(&option("dbName")."_".$importDate) != 1) {
 }
 
 if ( ! defined($allTables) && (scalar(keys %tables)) == 0) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] ( -all | <tables> ) - please use -all or a list of tables\n\n";
+    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> ) - please use -all or a list of tables\n\n";
     exit(0);
 }
 
 if (defined($allTables) && (scalar(keys %tables)) > 0) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] ( -all | <tables> ) - do not use -all and list files on the command line\n\n";
+    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> ) - do not use -all and list files on the command line\n\n";
     exit(0);
 }
 
-$inc = 10000;
+if ( ! defined($inc)) { $inc = 10000; }
 
 open T, "scripts/tableCols.txt";
 while (<T>) {
