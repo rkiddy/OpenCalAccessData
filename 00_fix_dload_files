@@ -575,6 +575,8 @@ if (defined($allFiles) || defined($files{$file})) {
 
         $line = &usual_fixes($line);
 
+        $line =~ s/\tE24593\'\t/\tE24593\t/;
+
         print F2 $line;
     }
 
