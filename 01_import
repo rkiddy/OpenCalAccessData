@@ -118,8 +118,21 @@ foreach (@files) {
             $month = $1;
             $day = $2;
             $year = $3;
-            if ($month < 10) { $month = "0".$month; }
-            if ($day < 10) { $day = "0".$day; }
+            while (length($month) < 2) { $month = "0".$month; }
+            while (length($day) < 2) { $day = "0".$day; }
+            $line = $pre."\t".$year."-".$month."-".$day."\t".$post;
+        }
+
+        # This will handle the effect_dt column in the filername table, which does not have " 12:00:00 AM" after the date.
+        #
+        while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})\t/) {
+            $pre = $`;
+            $post = $';
+            $month = $1;
+            $day = $2;
+            $year = $3;
+            while (length($month) < 2) { $month = "0".$month; }
+            while (length($day) < 2) { $day = "0".$day; }
             $line = $pre."\t".$year."-".$month."-".$day."\t".$post;
         }
 
@@ -135,11 +148,11 @@ foreach (@files) {
             $minute = $5;
             $second = $6;
             $ampm = $7;
-            if ($month < 10) { $month = "0".$month; }
-            if ($day < 10) { $day = "0".$day; }
-            if ($hour < 10) { $hour = "0".$hour; }
-            if ($minute < 10) { $minute = "0".$minute; }
-            if ($second < 10) { $second = "0".$second; }
+            while (length($month) < 2) { $month = "0".$month; }
+            while (length($day) < 2) { $day = "0".$day; }
+            while (length($hour) < 2) { $hour = "0".$hour; }
+            while (length($minute) < 2) { $minute = "0".$minute; }
+            while (length($second) < 2) { $second = "0".$second; }
             $line = $pre."\t".$year."-".$month."-".$day." ".$hour.":".$minute.":".$second." ".$ampm."\t".$post;
         }
 
