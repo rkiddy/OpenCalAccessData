@@ -52,6 +52,8 @@ if ( ! defined($startWith)) {
                 "id varchar(9));\n";
 
     print M "alter table named_things add primary key(table_name, table_pk, name_type);\n";
+
+    print M "alter table named_things add index(naml(20));\n";
 }
 
 open T, "scripts/tableCols.txt";
