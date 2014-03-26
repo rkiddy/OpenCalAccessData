@@ -19,7 +19,7 @@ email varchar(60)
 ballot_measures
 pk int primary key
 election_date date
-filer_id varchar(9)
+filer_id varchar(11)
 measure_no char(2)
 measure_name varchar(200)
 measure_short_name varchar(50)
@@ -31,7 +31,7 @@ filing_id int
 amend_id int
 rec_type char(4)
 form_type varchar(8)
-filer_id varchar(9)
+filer_id varchar(11)
 entity_cd char(3)
 filer_naml varchar(200)
 filer_namf varchar(45)
@@ -156,7 +156,7 @@ amend_id int
 rec_type char(4)
 form_type varchar(8)
 sender_id varchar(9)
-filer_id varchar(9)
+filer_id varchar(11)
 entity_cd char(3)
 filer_naml varchar(200)
 filer_namf varchar(45)
@@ -211,7 +211,7 @@ amend_id int NOT NULL
 rec_type char(4)
 form_type varchar(8)
 sender_id varchar(9)
-filer_id varchar(9)
+filer_id varchar(11)
 entity_cd char(3)
 filer_naml varchar(200)
 filer_namf varchar(45)
@@ -284,7 +284,7 @@ filing_id int
 amend_id int
 rec_type char(4)
 form_type varchar(8)
-filer_id varchar(9)
+filer_id varchar(11)
 entity_cd char(3)
 filer_naml varchar(200)
 filer_namf varchar(45)
@@ -577,7 +577,7 @@ filing_id int
 amend_id int
 rec_type varchar(4)
 form_type varchar(8)
-filer_id varchar(9)
+filer_id varchar(11)
 committee_id varchar(9)
 entity_cd int
 report_num varchar(3)
@@ -645,7 +645,7 @@ amend_txt1 varchar(330)
 filername
 pk int primary key
 xref_filer_id varchar(20)
-filer_id varchar(9)
+filer_id varchar(11)
 filer_type varchar(55)
 status varchar(20)
 effect_dt date
@@ -664,7 +664,7 @@ email varchar(60)
 
 filers
 pk int primary key
-filer_id int
+filer_id varchar(11)
 
 filings
 pk int primary key
@@ -684,11 +684,11 @@ deadline date
 filer_acronyms
 pk int primary key
 acronym varchar(32)
-filer_id varchar(9)
+filer_id varchar(11)
 
 filer_address
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 adrid int
 effect_dt date
 add_type int
@@ -696,14 +696,15 @@ session_id int
 
 filer_ethics_class
 pk int primary key
-filer_id int
+filer_id varchar(11)
 session_id int
 ethics_date date
 
 filer_filings
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 filing_id int
+high_amend_id int
 period_id int
 form_id varchar(7)
 filing_sequence int
@@ -721,15 +722,15 @@ filing_type varchar(6)
 
 filer_interests
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 session_id int
 interest_cd int
 effect_date date
 
 filer_links
 pk int primary key
-filer_id_a int
-filer_id_b int
+filer_id_a varchar(11)
+filer_id_b varchar(11)
 active_flg char(1)
 session_id int
 link_type int
@@ -745,7 +746,7 @@ status_desc varchar(100)
 
 filer_to_filer_type
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 filer_type int
 active char(1)
 race int
@@ -772,7 +773,7 @@ grace_period int
 
 filer_xref
 pk int primary key
-filer_id int
+filer_id varchar(11)
 xref_id varchar(32)
 effect_dt date
 migration_source varchar(50)
@@ -983,7 +984,7 @@ loan_amt8 decimal(12,2)
 
 lobbying_chg_log
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 change_no int
 session_id int
 log_dt date
@@ -1010,7 +1011,7 @@ effect_dt date
 
 lobbyist_contributions1
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 filing_period_start_dt date
 filing_period_end_dt date
 contribution_dt date
@@ -1020,7 +1021,7 @@ amount decimal(12,2)
 
 lobbyist_contributions2
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 filing_period_start_dt date
 filing_period_end_dt date
 contribution_dt date
@@ -1030,7 +1031,7 @@ amount decimal(12,2)
 
 lobbyist_contributions3
 pk int primary key
-filer_id varchar(9)
+filer_id varchar(11)
 filing_period_start_dt date
 filing_period_end_dt date
 contribution_dt date
@@ -1434,7 +1435,7 @@ intr_cmteid varchar(9)
 
 received_filings
 pk int primary key
-filer_id int
+filer_id varchar(11)
 filing_file_name varchar(60)
 received_date date
 filing_directory varchar(60)
