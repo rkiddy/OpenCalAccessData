@@ -20,7 +20,7 @@ tmpDir /tmp
 # User-specific information
 #
 dbName calaccess
-dbUser root
+dbUser ray
 dbPwd zekret_word
 
 projectDir /home/ubuntu
