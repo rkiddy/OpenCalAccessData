@@ -651,7 +651,7 @@ status varchar(20)
 effect_dt date
 naml varchar(200)
 namf varchar(45)
-namt varchar(63)
+namt varchar(128)
 nams varchar(10)
 adr1 varchar(55)
 adr2 varchar(55)

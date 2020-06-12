@@ -18,7 +18,7 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg !~ /\-/) { $tables{$arg} = 1; }
 }
 
-$usage = "\nusage: ./07_create_named_things -date <YYYYMMDD> [ -start <table> ]\n\n";
+$usage = "\nusage: ./07_create -date <YYYYMMDD> [ -start <table> ]\n\n";
 
 if ( ! defined($importDate)) { print $usage; exit(0); }
 
@@ -29,7 +29,7 @@ if (&db_exists(&option("dbName")."_".$importDate) != 1) {
 
 if ( ! defined($allTables) && scalar(%tables) == 0) { print $usage; exit(0); }
 
-if ( ! defined($inc)) { $inc = 1000000; }
+if ( ! defined($inc)) { $inc = 100000; }
 
 if ( ! defined($dryRun)) {
     open M, "| ".$myV."_".$importDate;
@@ -39,21 +39,18 @@ if ( ! defined($dryRun)) {
 
 if ( ! defined($startWith)) {
 
-    print M "drop table if exists named_things;\n";
+    print M "drop table if exists named;\n";
 
-    print M "create table named_things (".
+    print M "create table named (".
                 "table_name varchar(40), ".
                 "table_pk int, ".
                 "name_type varchar(6), ".
                 "naml varchar(200), ".
                 "namf varchar(45), ".
                 "namt varchar(10), ".
-                "nams varchar(10), ".
-                "id varchar(9));\n";
+                "nams varchar(10));\n";
 
-    print M "alter table named_things add primary key(table_name, table_pk, name_type);\n";
-
-    print M "alter table named_things add index(naml(20));\n";
+    print M "alter table named add primary key(table_name, table_pk, name_type);\n";
 }
 
 open T, "scripts/tableCols.txt";
@@ -81,7 +78,7 @@ while (<T>) {
 
             for ($lowPk = 0; $lowPk < $pk; $lowPk = $lowPk + $inc) {
 
-                print M "replace into named_things ".
+                print M "replace into named ".
                             "(table_name, table_pk, name_type, naml, namf, namt, nams) ".
                             "select '".$tableName."', pk, '".$type."', ".
                                     $type."_naml, ".$type."_namf, ".$type."_namt, ".$type."_nams from ".$tableName." ".
@@ -106,6 +103,8 @@ while (<T>) {
         }
     }
 }
+
+print M "alter table named add index(naml(20));\n";
 
 close M;
 

@@ -15,11 +15,13 @@ for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-inc") { $inc = $ARGV[$idx+1]; $idx++; next; }
 
+    if ($arg eq "-pk") { $pkOnly = $ARGV[$idx+1]; $idx++; next; }
+
     if ($arg !~ /^\-/) { $tables{$arg} = 1; }
 }
 
 if (scalar(@ARGV) == 0 || ! defined($importDate)) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> )\n";
+    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> )\n\n";
     exit(0);
 }
 
@@ -67,15 +69,19 @@ if (defined($allTables)) { %tables = %tablesFound; }
 
 print "\ntables count = ".(scalar(keys %tables))."\n\n";
 
-if (defined($dryrun)) {
-    open M, "| cat";
-} else {
-    open M, "| ".$myV."_".$importDate;
-}
-
-print M "set max_error_count = 65535;\n";
-
 foreach (sort keys %tables) {
+
+    if (defined($dryrun)) {
+        open M, "| cat";
+    } else {
+        open M, "| ".$myV."_".$importDate;
+    }
+
+    print M "set max_error_count = 65535;\n";
+
+    print M "SET GLOBAL sql_mode='ONLY_FULL_GROUP_BY,NO_ZERO_IN_DATE,NO_ZERO_DATE,".
+                                 "ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';\n";
+
     $table = $_;
 
     $cmd = "echo \"select max(pk) from ".$table."_cd;\" | ".$myQ."_".$importDate;
@@ -135,20 +141,33 @@ foreach (sort keys %tables) {
         $idx++;
     }
 
-    for ($idx = 0; $idx <= $pk; $idx = $idx + $inc) {
+
+    if (defined($pkOnly)) {
 
         print M "insert into ".$table." (\n";
         print M (join ",\n", @cols)."\n";
         print M ") select \n";
         print M (join ",\n", @cols)."\n";
         print M "from ".$table."_cd ";
-        print M "where pk > ".$idx." and pk <= ".($idx+$inc).";\n";
+        print M "where pk = ".$pkOnly.";\n";
 
-        if (defined($verbose)) { print M "show warnings;\n"; }
+    } else {
+
+        for ($idx = 0; $idx <= $pk; $idx = $idx + $inc) {
+
+            print M "insert into ".$table." (\n";
+            print M (join ",\n", @cols)."\n";
+            print M ") select \n";
+            print M (join ",\n", @cols)."\n";
+            print M "from ".$table."_cd ";
+            print M "where pk > ".$idx." and pk <= ".($idx+$inc).";\n";
+
+            if (defined($verbose)) { print M "show warnings;\n"; }
+        }
     }
-}
 
-close M;
+    close M;
+}
 
 exit(0);
 

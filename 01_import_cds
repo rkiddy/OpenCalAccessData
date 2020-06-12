@@ -3,8 +3,11 @@
 require "scripts/options.pl";
 
 sub tableNameFromFile {
-    @p = split '\.', $_;
+    @p = split '/', $_;
+    $t = pop @p;
+    @p = split '\.', $t;
     local $table = lc($p[0]);
+    if ($verbose > 0) { print "tableNameFromFile: \"".$_."\" -> \"".$table."\"\n"; }
     return $table;
 }
 
@@ -15,38 +18,65 @@ if (scalar(@ARGV) == 0) {
 
 my @files = ();
 
+$verbose = 0;
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
     if ($arg eq "-all") { $allFiles = 1; }
-    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
-    if ($arg =~ /\.TSV$/) { push @files, $arg; }
+    if ($arg eq "-none") { $noFiles = 1; }
+    if ($arg eq "--create-only") { $createOnly = 1; }
+    if ($arg eq "-date") { $import_date = $ARGV[$idx+1]; $idx++; next; }
+    if ($arg =~ /\.TSV_FIXED$/) { push @files, $arg; }
     if ($arg eq "-v") { $verbose = 1; }
 }
 
-if ( ! defined($importDate)) {
+if ( ! defined($import_date)) {
     print "\nNo -date parameter given.\n\n";
     exit(0);
 }
 
+$data_dir = "data_".$import_date;
+
 if (defined($allFiles)) {
-    $cmd = "/bin/ls -1 *_CD.TSV";
+    $cmd = option("find")." ".$data_dir."/CalAccess -name \\*_CD.TSV_FIXED";
+    # print "cmd: ".$cmd."\n";
     @files = `$cmd`;
     chomp(@files);
 }
 
-if ( ! defined($allFiles) && scalar(@files) == 0) {
+if ( ! defined($allFiles) && scalar(@files) == 0 && $noFiles != 1) {
+
     print "\nNo files...\n\n";
     exit(0);
+
+} else {
+
+    print "files:\n";
+    foreach $file (@files) {
+        print "    ".$file."\n";
+    }
+    print "\n";
 }
 
-if (&db_exists(&option("dbName")."_".$importDate) == 0) {
-open M, "| ".$myNo;
-print "create database ".&option("dbName")."_".$importDate.";\n";
-close M;
+if (&db_exists(option("dbName")."_".$import_date) == 0) {
+
+    $cmd = "create database ".option("dbName")."_".$import_date.";\n";
+
+    open M, "| ".$myNo;
+
+    if ($verbose > 0) { print "cmd: ".$cmd."\n"; }
+
+    print M $cmd;
+
+    close M;
+
+    if ($verbose > 0) { print "Created database with name: ".option("dbName")."_".$import_date."\n\n"; }
 }
 
-open M, "| ".$myV."_".$importDate;
+open M, "| ".$myV."_".$import_date;
+
+print M "SET GLOBAL local_infile = 'ON';\n";
 
 foreach (@files) {
 
@@ -56,7 +86,11 @@ foreach (@files) {
      #
      $table = &tableNameFromFile($file);
 
-     if ( ! -f &option("dataDir")."/".$file ) {
+     if ($file !~ /^data_/) { $file = "data_".$import_date."/CalAccess/DATA/".$file; }
+
+     print "testing for file: \"".$file."\"\n";
+
+     if ( ! -f $file ) {
          print "\nERROR: Something wrong? Given a file that does not exist. Aborting.\n\n";
          exit(1);
      }
@@ -65,7 +99,8 @@ foreach (@files) {
 
      print M "-- table: ".$table."\n";
 
-     $cmd = &option("head")." -1 ".$file;
+     $cmd = option("head")." -1 ".$file;
+     print "cmd: ".$cmd."\n";
      $topLine = `$cmd`;
      chomp($topLine);
 
@@ -82,12 +117,17 @@ foreach (@files) {
 
 close M;
 
-open M, "| ".$myV."_".$importDate;
+if ($createOnly > 0) { exit(0); }
+
+open M, "| ".$myV."_".$import_date;
+
+print M "SET GLOBAL local_infile = 'ON';\n";
 
 foreach (@files) {
 
     $file = $_;
-    $endFile = lc($file);
+
+    if ($file !~ /^data_/) { $file = "data_".$import_date."/CalAccess/DATA/".$file; }
 
     # Given "TEXT_MEMO_CD.TSV" in the data directory, this will now be "text_memo_cd".
     #
@@ -97,11 +137,11 @@ foreach (@files) {
 
     $pk = 1;
 
-    if (defined($verbose)) { print "open SQL_IN, ".&option("dataDir")."/".$file."\n"; }
-    open SQL_IN, &option("dataDir")."/".$file;
+    if (defined($verbose)) { print "open SQL_IN, ".$file."\n"; }
+    open SQL_IN, $file;
 
-    if (defined($verbose)) { print "open SQL_OUT, >".&option("tmpDir")."/".$endFile."\n"; }
-    open SQL_OUT, ">".&option("tmpDir")."/".$endFile;
+    if (defined($verbose)) { print "open SQL_OUT, >".option("tmpDir")."/".$table."\n"; }
+    open SQL_OUT, ">".option("tmpDir")."/".$table;
 
     $first = <SQL_IN>;
     print SQL_OUT "pk\t".$first;
@@ -163,17 +203,19 @@ foreach (@files) {
     close SQL_IN;
     close SQL_OUT;
 
-    open M, "| ".&option("mysql")." -u ".&option("dbUser")." --password=".&option("dbPwd")." -vvv --local-infile ".&option("dbName")."_".$importDate;
+    open M, "| ".option("mysql")." -vvv --local-infile ".option("dbName")."_".$import_date;
 
     print M "set max_error_count=65535;\n";
 
-    $sql = "load data local infile '".&option("tmpDir")."/".$endFile."' into table ".$table." ".
+    $sql = "load data local infile '".option("tmpDir")."/".$table."' into table ".$table." ".
            "fields terminated by '\\t' lines terminated by '\\r\\n' ignore 1 lines;\n";
 
     print M $sql;
     print M "show warnings;\n";
 
     close M;
+
+    unlink(option("tmpDir")."/".$table);
 }
 
 print "\nDone!\n";

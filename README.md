@@ -3,52 +3,19 @@ The OpenCalAccessData project is an attempt to publish information about the Cal
 released by the California Secretary of State's office, Political Reform Division and publish "fixes" to
 data so that others might find this information more valuable.
 
-The zip file at http://campaignfinance.cdn.sos.ca.gov/dbwebexport.zip contains two zip files, one with a
-"doc_" prefix and the other with a "db_" prefix. The doc file has not changed since I have been tracking
-this (2013/10/28). The db file changes every day, but I am not sure what time it gets updated, if there
-is a regular time. The SoS also does not publish a digest value, so one cannot verify the integrity of the
-download, or timestamp the file in any visible way. And the SoS offically provides no support for anything
-done with this data.
+* Requirements
 
-As a matter of fact, the SoS cannot correct anything in the data. The data is filed as it is filed and
-is a legal document. Because the system that accepts on-line submissions does not seem to do any data
-validation before accepting the data, a lot of stuff has been accepted.
+- MySQL
+- perl
+- head, grep and other Unix-like utilities
 
-And, if the SoS keeps track of errors reported in the data, they do not let anyone in the public know of it.
-They will hear you if you report something and thank you for the information, but there is nothing that
-they will do about it. Or, if there is, there is nothing they will be able to tell you about what they can do.
-
-So, if someone says they live in "Oatland, CA", or their city is "Fresno CA" (while leaving the state field
-blank), or say they have a 2 digit phone number, there is nothing the SoS can do to correct the data.
-
-But we, as members of the public, can see this data and I can set up a system to track errors in it so that
-we know about them and can see the corrected data. I have found errors in the data and, at times, I have ways
-to correct them. I have no authorization to correct the data, but when I have the data, it is no longer a
-legal record of the data, but it is instead my copy of the legal record, to do with as I will. So, I will.
-And I will not claim that this data is the legal record, so that is all good.
-
-If you have any suggestions about any of this, please contact me at:
+If you have any suggestions or questions, please contact me at:
 
 ray the round thing with a lower case A in it ganymede the bottom half of a colon org
 
-* THIS REPO
+If you mention "OpenCalAccessData" in the Subject, it will make it more likely that I will see your message.
 
-This repository exists for two purposes. First, it is a place to record issues with the data and its structure.
-Second, I can keep track of the scripts and tools that I used to fix the data.
-
-The data itself is, right now, 3,741,089,054 bytes and I am not checking the data itself into the repository. I
-think that github would not be happy about this. The first line of the import values is kept so that this can be
-verified by the scripts.
-
-The intention here is that a new copy of the data can be downloaded from the SoS web site (above) and that new
-data can be integrated into the existing data. But one also should be able to re-create the database at any time
-from the files.
-
-The scripts to do this are as follows. Do not judge me harshly by these scripts. Unless I am trying to do
-something else, I write old-school perl. If anyone wants to demonstrate a better way to script, please feel free
-to do so. I would love to hear from you.
-
----------------
+* Scripts
 
 * 00_fix_dload_files
 * 01_import
@@ -63,10 +30,10 @@ to do so. I would love to hear from you.
 * check_states
 * options.pl
 
-----------------
+* Details
 
 These scripts rely on a file, ~/.opencalaccess, in which you can declare ivars for dependencies in your local
-environment. My copy of this file contains:
+environment. My copy of this file is similar to this:
 
      # Defining executable paths here so that this can run on different platforms.
      #

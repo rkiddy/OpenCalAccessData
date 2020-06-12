@@ -2,46 +2,121 @@
 
 require "scripts/options.pl";
 
+$verbose = 0;
+$no_orig = 0;
+
+$url = "https://campaignfinance.cdn.sos.ca.gov/dbwebexport.zip";
+# $url = "http://opencalaccess.org/dbwebexport.zip";
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
     if ($arg eq "-all") { $allFiles = 1; }
     if ($arg eq "-v") { $verbose = 1; }
     if ($arg eq "-vv") { $verbose = 2; }
+    if ($arg eq "-date") { $date = $ARGV[$idx+1]; $idx++ }
+    if ($arg eq "-no-orig") { $no_orig = 1; }
 
     if ($arg !~ /^\-/) { $files{$arg} = 1; }
 }
 
-$date = `date '+%Y%m%d_%H%M%S'`;
-chomp($date);
+if ($verbose > 0) {
+    if (defined($allFiles)) {
+        print "  option: processing all files...\n";
+    }
+    print "  option: verbose = ".$verbose."\n";
+    print "  option: no_orig = ".$no_orig."\n";
+    if (defined($date)) {
+        print "  option: pre-defined date = \"".$date."\"\n";
+    }
+}
 
 if ( ! defined($allFiles) && scalar(keys %files) == 0) {
     print "\nusage: ./00_fix_dload_files ( -all | <files> )\n\n";
     exit(0);
 }
 
-if (defined($verbose) && scalar(%files) > 0) {
-    foreach (sort keys %files) { print "given table: \"".$_."\"\n"; }
+if ( ! defined($date)) {
+    $date = `date '+%Y%m%d'`;
+    chomp($date);
+}
+
+$data_dir = option("projectDir")."/data_".$date;
+
+print "  option: data_dir: \"".$data_dir."\"\n";
+
+if ( ! -d $data_dir) {
+
+    mkdir $data_dir || die("Cannot create directory: ".$data_dir."\n");
+
+    if ($verbose > 0) { print "Created dir: ".$data_dir."\n"; }
+} else {
+
+    if ($verbose > 0) { print "NOT creating, existing dir: ".$data_dir."\n"; }
+}
+
+if ( ! -f $data_dir."/dbwebexport.zip") {
+
+    $cmd = option("curl")." --silent --output ".$data_dir."/dbwebexport.zip ".$url;
+
+    if ($verbose > 0) { print "Fetching file from SoS...\n"; }
+
+    `$cmd`;
+    if ($? != 0) { die("Error fetching dbwebexport.zip file!"); }
+
+} else {
+
+    if ($verbose > 0) { print "NOT fetching, found file: ".$data_dir."/dbwebexport.zip\n"; }
+}
+
+if ( ! -d $data_dir."/CalAccess") {
+
+    $cmd = "( cd ".$data_dir." ; ".option("unzip")." dbwebexport.zip )";
+
+    if ($verbose > 0) { print "Unzipping db export file...\n"; }
+
+    `$cmd`;
+
+} else {
+    if ($verbose > 0) { print "NOT unzipping, found dir: ".$data_dir."/CalAccess\n"; }
+}
+
+if ($verbose > 0 && scalar(%files) > 0) {
+    foreach (sort keys %files) { print "  using file: \"".$_."\"\n"; }
 }
 
 if (defined($allFiles)) {
-    $cmd = "/bin/ls *_CD.TSV";
-    @files = `$cmd`;
-    chomp(@files);
 
-    foreach (@files) { $files{$_} = 1; }
+    $cmd = option("find")." ".$data_dir."/CalAccess -name \\*_CD.TSV";
+    print "cmd: ".$cmd."\n";
+
+    @files_found = `$cmd`;
+    chomp(@files_found);
+
+    foreach (@files_found) {
+        $full_file = $_;
+        @parts = split '/', $full_file;
+        $files{pop(@parts)} = $full_file;
+    }
 
 } else {
 
     foreach (keys %files) {
         $file = $_;
         $file = uc($file);
-        if ($file !~ /_CD\.TSV/) {
-            $file = $file."_CD.TSV";
-        }
-        $nextFiles{$file} = 1;
+        $cmd = option("find")." ".$data_dir." -name ".$file;
+
+        $full_file = `$cmd`;
+        chomp($full_file);
+        $nextFiles{$file} = $full_file;
     }
     %files = %nextFiles;
+}
+
+if ($verbose > 0) {
+    foreach (keys %files) {
+        print "  target file: ".$_." -> ".$files{$_}."\n";
+    }
 }
 
 sub remove_field {
@@ -87,28 +162,10 @@ sub add_field {
     return @next;
 }
 
-sub compare_results {
-
-    $cmd = &option("diff")." -y --suppress-common-lines ".$file." ".$outFile;
-
-    @changes = `$cmd`;
-
-    if ($verbose > 1) {
-        print "\ncompare_results: changes:\n".(join "\n", @changes)."\n";
-    }
-
-    if (scalar(@changes) == 0) {
-        if (defined($verbose)) { print "\nNo changes, removing FIXED file.\n"; }
-        print "\n";
-        unlink $outFile;
-    } else {
-        print "\nchanged ".scalar(@changes).", original data -> \"".$file."_ORIG_".$date."\"\n";
-        rename $file, $file."_ORIG_".$date;
-        rename $outFile, $file;
-    }
-}
+sub compare_results { }
 
 sub usual_fixes {
+
     $nextLine = $_[0];
 
     # eliminate extra backslashes and spaces in front of tabs
@@ -132,12 +189,14 @@ $file = "ACRONYMS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
 
-    print "\nfixing ".$file."...";
+    $out_file = $found_file."_FIXED";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    print "\nfixing ".$found_file."...";
+
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -150,7 +209,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # ADDRESS_CD.TSV
@@ -159,12 +218,14 @@ $file = "ADDRESS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -177,7 +238,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # BALLOT_MEASURES_CD.TSV
@@ -186,12 +247,14 @@ $file = "BALLOT_MEASURES_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -204,7 +267,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR2_CAMPAIGN_DISCLOSURE_CD.TSV
@@ -213,12 +276,14 @@ $file = "CVR2_CAMPAIGN_DISCLOSURE_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -244,7 +309,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR2_LOBBY_DISCLOSURE_CD.TSV
@@ -253,12 +318,14 @@ $file = "CVR2_LOBBY_DISCLOSURE_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -271,7 +338,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR2_REGISTRATION_CD.TSV
@@ -280,12 +347,14 @@ $file = "CVR2_REGISTRATION_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -298,7 +367,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR2_SO_CD.TSV
@@ -307,12 +376,14 @@ $file = "CVR2_SO_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -325,7 +396,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR3_VERIFICATION_INFO_CD.TSV
@@ -334,12 +405,14 @@ $file = "CVR3_VERIFICATION_INFO_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -352,7 +425,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR_CAMPAIGN_DISCLOSURE_CD.TSV
@@ -361,12 +434,14 @@ $file = "CVR_CAMPAIGN_DISCLOSURE_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -395,7 +470,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR_E530_CD.TSV
@@ -404,12 +479,14 @@ $file = "CVR_E530_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -422,7 +499,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR_LOBBY_DISCLOSURE_CD.TSV
@@ -431,12 +508,14 @@ $file = "CVR_LOBBY_DISCLOSURE_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -473,7 +552,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR_REGISTRATION_CD.TSV
@@ -482,12 +561,14 @@ $file = "CVR_REGISTRATION_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -500,7 +581,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # CVR_SO_CD.TSV
@@ -509,12 +590,14 @@ $file = "CVR_SO_CD.TSV";
 #
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -527,7 +610,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # DEBT_CD.TSV
@@ -536,12 +619,14 @@ $file = "DEBT_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -554,7 +639,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # EFS_FILING_LOG_CD.TSV
@@ -563,12 +648,14 @@ $file = "EFS_FILING_LOG_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -583,7 +670,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # EXPN_CD.TSV
@@ -592,12 +679,14 @@ $file = "EXPN_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     $top = <F1>;
     print F2 $top;
@@ -637,7 +726,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # F495P2_CD.TSV
@@ -646,12 +735,14 @@ $file = "F495P2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -664,7 +755,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # F501_502_CD.TSV
@@ -673,12 +764,14 @@ $file = "F501_502_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -691,7 +784,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # F690P2_CD.TSV
@@ -700,12 +793,14 @@ $file = "F690P2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -718,7 +813,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_ACRONYMS_CD.TSV
@@ -727,12 +822,14 @@ $file = "FILER_ACRONYMS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -745,7 +842,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_ADDRESS_CD.TSV
@@ -754,12 +851,14 @@ $file = "FILER_ADDRESS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -772,7 +871,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_ETHICS_CLASS_CD.TSV
@@ -781,12 +880,14 @@ $file = "FILER_ETHICS_CLASS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -799,7 +900,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_FILINGS_CD.TSV
@@ -808,12 +909,14 @@ $file = "FILER_FILINGS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -826,7 +929,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_INTERESTS_CD.TSV
@@ -835,12 +938,14 @@ $file = "FILER_INTERESTS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -853,7 +958,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_LINKS_CD.TSV
@@ -862,12 +967,14 @@ $file = "FILER_LINKS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -880,7 +987,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILERNAME_CD.TSV
@@ -889,12 +996,14 @@ $file = "FILERNAME_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     @lines = <F1>;
     close F1;
@@ -905,6 +1014,8 @@ if (defined($allFiles) || defined($files{$file})) {
         if ($line eq "") { next; }
 
         $line = &usual_fixes($line);
+
+        if ($line =~ /^1274366\t/) { $line =~ s/\tOJAI/OJAI/; }
 
         $line =~ s/\\ CHANDLER/\/ CHANDLER/;
 
@@ -929,7 +1040,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILERS_CD.TSV
@@ -938,12 +1049,14 @@ $file = "FILERS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -956,7 +1069,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_STATUS_TYPES_CD.TSV
@@ -965,12 +1078,14 @@ $file = "FILER_STATUS_TYPES_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -983,7 +1098,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_TO_FILER_TYPE_CD.TSV
@@ -992,12 +1107,14 @@ $file = "FILER_TO_FILER_TYPE_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1023,7 +1140,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_TYPES_CD.TSV
@@ -1032,12 +1149,14 @@ $file = "FILER_TYPES_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1050,7 +1169,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILER_XREF_CD.TSV
@@ -1059,12 +1178,14 @@ $file = "FILER_XREF_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1077,7 +1198,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILING_PERIOD_CD.TSV
@@ -1086,12 +1207,14 @@ $file = "FILING_PERIOD_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1104,7 +1227,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # FILINGS_CD.TSV
@@ -1113,12 +1236,14 @@ $file = "FILINGS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1131,7 +1256,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # GROUP_TYPES_CD.TSV
@@ -1140,12 +1265,14 @@ $file = "GROUP_TYPES_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1158,7 +1285,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # HDR_CD.TSV
@@ -1167,12 +1294,14 @@ $file = "HDR_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1185,7 +1314,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # HEADER_CD.TSV
@@ -1194,12 +1323,14 @@ $file = "HEADER_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1212,7 +1343,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # IMAGE_LINKS_CD.TSV
@@ -1221,12 +1352,14 @@ $file = "IMAGE_LINKS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1239,7 +1372,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LATT_CD.TSV
@@ -1248,12 +1381,14 @@ $file = "LATT_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1266,7 +1401,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LCCM_CD.TSV
@@ -1275,12 +1410,14 @@ $file = "LCCM_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1300,7 +1437,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LEGISLATIVE_SESSIONS_CD.TSV
@@ -1309,12 +1446,14 @@ $file = "LEGISLATIVE_SESSIONS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1327,7 +1466,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LEMP_CD.TSV
@@ -1336,12 +1475,14 @@ $file = "LEMP_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1378,7 +1519,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LEXP_CD.TSV
@@ -1387,12 +1528,14 @@ $file = "LEXP_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1460,7 +1603,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOAN_CD.TSV
@@ -1469,12 +1612,14 @@ $file = "LOAN_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1495,7 +1640,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBY_AMENDMENTS_CD.TSV
@@ -1504,12 +1649,14 @@ $file = "LOBBY_AMENDMENTS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1522,7 +1669,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYING_CHG_LOG_CD.TSV
@@ -1531,12 +1678,14 @@ $file = "LOBBYING_CHG_LOG_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1551,7 +1700,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 
@@ -1561,12 +1710,14 @@ $file = "LOBBYIST_CONTRIBUTIONS1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1579,7 +1730,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_CONTRIBUTIONS2_CD.TSV
@@ -1588,12 +1739,14 @@ $file = "LOBBYIST_CONTRIBUTIONS2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1606,7 +1759,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_CONTRIBUTIONS3_CD.TSV
@@ -1615,12 +1768,14 @@ $file = "LOBBYIST_CONTRIBUTIONS3_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1633,7 +1788,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMP_LOBBYIST1_CD.TSV
@@ -1642,12 +1797,14 @@ $file = "LOBBYIST_EMP_LOBBYIST1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1660,7 +1817,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMP_LOBBYIST2_CD.TSV
@@ -1669,12 +1826,14 @@ $file = "LOBBYIST_EMP_LOBBYIST2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1687,7 +1846,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMPLOYER1_CD.TSV
@@ -1696,12 +1855,14 @@ $file = "LOBBYIST_EMPLOYER1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1714,7 +1875,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMPLOYER2_CD.TSV
@@ -1723,12 +1884,14 @@ $file = "LOBBYIST_EMPLOYER2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1741,7 +1904,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMPLOYER3_CD.TSV
@@ -1750,12 +1913,14 @@ $file = "LOBBYIST_EMPLOYER3_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1768,7 +1933,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMPLOYER_FIRMS1_CD.TSV
@@ -1777,12 +1942,14 @@ $file = "LOBBYIST_EMPLOYER_FIRMS1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1795,7 +1962,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_EMPLOYER_FIRMS2_CD.TSV
@@ -1804,12 +1971,14 @@ $file = "LOBBYIST_EMPLOYER_FIRMS2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1822,7 +1991,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM1_CD.TSV
@@ -1831,12 +2000,14 @@ $file = "LOBBYIST_FIRM1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1849,7 +2020,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM2_CD.TSV
@@ -1858,12 +2029,14 @@ $file = "LOBBYIST_FIRM2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1876,7 +2049,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM3_CD.TSV
@@ -1885,12 +2058,14 @@ $file = "LOBBYIST_FIRM3_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1903,7 +2078,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM_EMPLOYER1_CD.TSV
@@ -1912,12 +2087,14 @@ $file = "LOBBYIST_FIRM_EMPLOYER1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1930,7 +2107,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM_EMPLOYER2_CD.TSV
@@ -1939,12 +2116,14 @@ $file = "LOBBYIST_FIRM_EMPLOYER2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1957,7 +2136,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM_LOBBYIST1_CD.TSV
@@ -1966,12 +2145,14 @@ $file = "LOBBYIST_FIRM_LOBBYIST1_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -1984,7 +2165,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOBBYIST_FIRM_LOBBYIST2_CD.TSV
@@ -1993,12 +2174,14 @@ $file = "LOBBYIST_FIRM_LOBBYIST2_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2011,7 +2194,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOOKUP_CODES_CD.TSV
@@ -2020,12 +2203,14 @@ $file = "LOOKUP_CODES_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2038,7 +2223,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LOTH_CD.TSV
@@ -2047,12 +2232,14 @@ $file = "LOTH_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2065,7 +2252,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # LPAY_CD.TSV
@@ -2074,12 +2261,14 @@ $file = "LPAY_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2132,7 +2321,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # NAMES_CD.TSV
@@ -2141,12 +2330,14 @@ $file = "NAMES_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     @lines = <F1>;
     close F1;
@@ -2323,7 +2514,7 @@ if (defined($allFiles) || defined($files{$file})) {
 
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # RCPT_CD.TSV
@@ -2332,12 +2523,14 @@ $file = "RCPT_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     @lines = <F1>;
     close F1;
@@ -2359,7 +2552,7 @@ if (defined($allFiles) || defined($files{$file})) {
 
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # RECEIVED_FILINGS_CD.TSV
@@ -2368,12 +2561,14 @@ $file = "RECEIVED_FILINGS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2386,7 +2581,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # REPORTS_CD.TSV
@@ -2395,12 +2590,14 @@ $file = "REPORTS_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2413,7 +2610,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # S401_CD.TSV
@@ -2422,12 +2619,14 @@ $file = "S401_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2440,7 +2639,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # S496_CD.TSV
@@ -2449,12 +2648,14 @@ $file = "S496_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2467,7 +2668,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # S497_CD.TSV
@@ -2476,12 +2677,14 @@ $file = "S497_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2494,7 +2697,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # S498_CD.TSV
@@ -2503,12 +2706,14 @@ $file = "S498_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2521,7 +2726,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # SMRY_CD.TSV
@@ -2530,12 +2735,14 @@ $file = "SMRY_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2548,7 +2755,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # SPLT_CD.TSV
@@ -2557,12 +2764,14 @@ $file = "SPLT_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    open F1, $file;
-    open F2, "> ".$outFile;
+    open F1, $found_file;
+    open F2, "> ".$out_file;
 
     while (<F1>) {
         $line = $_;
@@ -2575,7 +2784,7 @@ if (defined($allFiles) || defined($files{$file})) {
     close F1;
     close F2;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 # TEXT_MEMO_CD.TSV
@@ -2586,17 +2795,20 @@ $file = "TEXT_MEMO_CD.TSV";
 
 if (defined($allFiles) || defined($files{$file})) {
 
-    $outFile = $file."_FIXED";
+    $found_file = $files{$file};
+
+    $out_file = $found_file."_FIXED";
 
     print "\nfixing ".$file."...";
 
-    $cmd = "/usr/bin/tr '\\r' '\\n' < ".$file." | /bin/grep -v \'^\$\' | /usr/bin/perl -p -e 's/\\n/\\r\\n/g' -";
+    $cmd = option("tr")." '\\r' '\\n' < ".$found_file." | ".option("grep")." -v \'^\$\' | ".option("perl")." -p -e 's/\\n/\\r\\n/g' -";
 
     @lines = `$cmd`;
 
-    open T, ">".$outFile;
+    open T, ">".$out_file;
 
     foreach (@lines) {
+
         $line = $_;
 
         $line = &usual_fixes($line);
@@ -2611,9 +2823,9 @@ if (defined($allFiles) || defined($files{$file})) {
         }
     }
 
-    close $outFile;
+    close $out_file;
 
-    &compare_results();
+    &compare_results($found_file, $out_file);
 }
 
 print "\n\nOk\n\n";

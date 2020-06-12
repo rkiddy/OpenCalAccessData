@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+
+$date = $ARGV[0];
+$file = $ARGV[1];
+$num = $ARGV[2];
+
+$filename = "data_".$date."/CalAccess/DATA/".$file;
+print "filename: \"".$filename."\"\n";
+
+open T, $filename;
+
+$head = <T>; chomp;
+
+@headers = split '\t', $head;
+
+print "headers # ".scalar(@headers)."\n";
+
+for ($idx = 0; $idx < $num; $idx++) { $line = <T>; }
+
+$line = <T>; chomp;
+
+@parts = split '\t', $line;
+
+while (scalar(@parts) > scalar(@headers)) {
+   push (@headers, "");
+}
+
+for ($idx = 0; $idx < scalar(@headers); $idx++) {
+    print $idx." - ".$headers[$idx]." - \"".$parts[$idx]."\"\n";
+}
+
