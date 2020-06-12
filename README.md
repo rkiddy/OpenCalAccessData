@@ -13,45 +13,41 @@ If you have any suggestions or questions, please contact me at:
 
 ray the round thing with a lower case A in it ganymede the bottom half of a colon org
 
-If you mention "OpenCalAccessData" in the Subject, it will make it more likely that I will see your message.
+If you mention "open_calaccess_data_perl" in the Subject, it will make it more likely that I will see your message.
 
 * Scripts
 
-* 00_fix_dload_files
-* 01_import
-* 02_create
-* 03_fix_dates
+* 00_dload_and_fix_files
+* 01_import_cds
+* 02_create_noncds
+* 03_drop_cds
 * 04_mark_high_amends
 * 05_check_filed_counts
-* 06_drop_cds
-* 09_move_database
-* 0a_test_data
-* check_filing_id
-* check_states
-* options.pl
+* 07_create_named
 
 * Details
 
 These scripts rely on a file, ~/.opencalaccess, in which you can declare ivars for dependencies in your local
 environment. My copy of this file is similar to this:
 
-     # Defining executable paths here so that this can run on different platforms.
-     #
-     mysql /usr/bin/mysql
-     head /usr/bin/head
-     cat /bin/cat
-     
-     # Perhaps host-specific file system paths
-     #
+     projectDir /Users/ray/Projects/OpenCalAccessData
      tmpDir /tmp
-     projectDir /home/ray/Projects
-     dataDir /home/ray/Projects/OpenCalAccessData
      
-     # user-specific information
-     #
-     dbName calaccess
+     curl /usr/bin/curl
+     unzip /usr/bin/unzip
+     gzip /usr/bin/gzip
+     find /usr/bin/find
+     diff /usr/bin/diff
+     tr /usr/bin/tr
+     grep /usr/bin/grep
+     perl /usr/bin/perl
+     head /usr/bin/head
+     
      dbUser ray
-     dbPwd zekretWrd
+     dbPwd much_zekret_word
+     dbName ca_sos
+     
+     mysql /usr/local/mysql/bin/mysql
 
 * 00_fix_dload_files
 
@@ -60,7 +56,7 @@ better ways to correct the errors in the files, the code gets more concise. The 
 error appears in the files, it will probably stay there forever. The SoS cannot correct data as filed. There
 are some files they produce and so they can fix them. It is not clear that they feel any need to do so.
 
-* 01_import
+* 01_import_cds
 
 This script uses the columns listed in the import file to create a table that has blob columns. It is (fairly)
 safe to import into this table and most errors do not break the import. The ones that do, such as when extra
@@ -73,10 +69,10 @@ The raw tables have the suffix "_cd" on their names. After the data is transferr
 
 This script will always drop and create the cd table or tables.
 
-* 02_create
+* 02_create_noncds
 
 This script pulls the data from the "cd" table or tables and puts it into properly defined tables. See the
-"tableCols.txt" file for the table column definitions. This file is used by many of the scripts.
+"tableCols.txt" file in the scripts directory for the table column definitions. This file is used by many of the scripts.
 
 This script will always drop and create the target table or tables.
 
@@ -95,20 +91,15 @@ but because columns have been transposed, or extra tabs are found, or tabs are m
 There is a lot of data validation still to do after this step, but most of that has to do with the meaning of
 the data values and not the structure.
 
-* 03_fix_dates
+* 03_drop_cds
 
-The SoS database stores dates as "12/29/2000 12:00:00 AM". This form is used even when the date is really
-just a date and does not have a time associated with it. I turn these into MySQL-compatible strings, so that
-the previous value becomes "2000-12-29". I do not turn these columns into date or datetime columns, but this
-could be done if desired.
-
-This script can be run at any time and it does not damage any of the data. It matches only on date or datetime
-values in the old format and does not update any data that is in the correct format.
-
-If this script has already been run, it does not damage corrected rows. It can be run multiple times without
-worry.
+Does the obvious.
 
 * 04_mark_high_amends
+
+This adds a "high_amend_id" column to the filer_filings table and adds the correct value. This should make it easier for
+scripts to ignore the previous versions of the reports. TODO: It may be better to just delete the earlier versions, but there
+is risk and the space may not get released on disk.
 
 * 05_check_filed_counts
 
@@ -122,16 +113,13 @@ TODO: These filings_counted should include the form_id of the filing. It would b
 
 This script can be run at any time and it does not damage any of the data.
 
-* 06_drop_cds
+* 07_create_named
 
-This script will drop the tables produced by the 01_import script. They can be re-created at will.
+Many tabls have one or more names in a row, stored in columns: xxx_naml, xxx_namf, xxx_namt, xxx_nams. This stores each one of these
+as its own row, with a link to the original table and the original prefix. Prefixes are: agent, treas, ctrib, recip, cand, and several
+other, more obscure, values.
 
-* 09_move_database
-
-This script takes two database names as parameters. It creates the target database if necessary and
-moves the tables from the source database, the 1st parameter, to the target database, the 2nd parameter.
-
-* 0a_test_data
+* 99_test_data
 
 TBD: Tests things to see if they are correct, whatever that means.
 
