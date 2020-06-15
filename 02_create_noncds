@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-require `pwd`."/scripts/options.pl";
+require $ENV{'HOME'}."/open_calaccess_data_perl/scripts/options.pl";
 
 for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
