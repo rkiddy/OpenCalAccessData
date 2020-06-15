@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
+require `pwd`."/scripts/options.pl";
 
 $usage = "usage: ./09_move_database";
 
