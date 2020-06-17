@@ -145,9 +145,7 @@ if (defined($bothTables) || defined($filingOnly)) {
                     undef @filingIds;
                 }
             }
-            if (defined(@filingIds)) {
-                print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
-            }
+            print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
         }
         print "\n";
 
@@ -200,9 +198,7 @@ if (defined($bothTables) || defined($filerOnly)) {
                     undef @filerIds;
                 }
             }
-            if (defined(@filerIds)) {
-                print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
-            }
+            print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
         }
         print "\n";
 

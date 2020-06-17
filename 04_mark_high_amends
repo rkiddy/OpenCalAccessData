@@ -19,7 +19,7 @@ if (&db_exists(&option("dbName")."_".$importDate) != 1) {
     exit(1);
 }
 
-if ( ! defined(%tables)) {
+#if ( ! defined(%tables)) {
     open T, "scripts/tableCols.txt";
     while (<T>) {
         chomp;
@@ -27,7 +27,7 @@ if ( ! defined(%tables)) {
         if ($line ne "" && $line !~ / /) { $tName = $_; }
         if ($line =~ /^amend_id/) { $tables{$tName} = 1; }
     }
-}
+#}
 
 delete $tables{"filings"};
 

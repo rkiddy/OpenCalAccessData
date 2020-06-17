@@ -51,6 +51,7 @@ if ( ! defined($startWith)) {
                 "nams varchar(10));\n";
 
     print M "alter table named add primary key(table_name, table_pk, name_type);\n";
+    print M "alter table named add column uniq_pk int;\n";
 }
 
 open T, "scripts/tableCols.txt";
