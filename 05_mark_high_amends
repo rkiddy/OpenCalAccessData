@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-require $ENV{'HOME'}."/open_calaccess_data_perl/scripts/options.pl";
+require "scripts/options.pl";
 
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
@@ -19,7 +19,7 @@ if (&db_exists(&option("dbName")."_".$importDate) != 1) {
     exit(1);
 }
 
-#if ( ! defined(%tables)) {
+if ( ! defined(%tables)) {
     open T, "scripts/tableCols.txt";
     while (<T>) {
         chomp;
@@ -27,7 +27,7 @@ if (&db_exists(&option("dbName")."_".$importDate) != 1) {
         if ($line ne "" && $line !~ / /) { $tName = $_; }
         if ($line =~ /^amend_id/) { $tables{$tName} = 1; }
     }
-#}
+}
 
 delete $tables{"filings"};
 

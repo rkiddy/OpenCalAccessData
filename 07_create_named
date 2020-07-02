@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-require $ENV{'HOME'}."/open_calaccess_data_perl/scripts/options.pl";
+require "scripts/options.pl";
 
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
@@ -51,7 +51,6 @@ if ( ! defined($startWith)) {
                 "nams varchar(10));\n";
 
     print M "alter table named add primary key(table_name, table_pk, name_type);\n";
-    print M "alter table named add column uniq_pk int;\n";
 }
 
 open T, "scripts/tableCols.txt";

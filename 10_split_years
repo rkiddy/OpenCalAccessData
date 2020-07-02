@@ -1,0 +1,72 @@
+#!/bin/sh
+
+if [ "$1" != "-date" ] || [ "$2" = "" ]; then
+    echo ""
+    echo "usage: ./10_split_years -date <YYYYMMDD> [ -all | <table1> <table2> ... ]"
+    echo ""
+    exit
+fi
+
+db=$2
+
+shift 2
+
+if [ "$1" = "-drop" ]; then
+    drop="yes"
+    shift 1
+else
+    drop="no"
+fi
+
+if [ "$1" = "-combine" ]; then
+    combine="yes"
+    shift 1
+else
+    combine="no"
+fi
+
+if [ $combine = "no" ] && [ $drop = "no" ]; then
+    add="yes"
+else
+    add="no"
+fi
+
+tables=$@
+
+if [ "$tables" = "-all" ] || [ "$tables" = "" ]; then
+
+    tables=`awk 'BEGIN{FS="\n";RS=""}{print $1}' scripts/tablesWithFilingId.txt`
+fi
+
+for table in $tables
+do
+    echo "table: "$table
+
+    years=`cat scripts/years.txt | tr '\n' ' '`
+
+    for year in $years
+    do
+
+        if [ $add = "yes" ]; then
+            ( echo "create table "$table"_"$year" like "$table";"
+              echo "insert into "$table"_"$year" select * from "$table" where filing_id in"
+              echo "  (select filing_id from filer_filings where rpt_start like '"$year"%');" ) | \
+            mysql -vvv ca_sos_$db
+        fi
+
+        if [ $drop = "yes" ]; then
+            echo "drop table "$table"_"$year";" | mysql -vvv ca_sos_$db
+        fi
+
+        if [ $combine = "yes" ]; then
+            echo "" | mysql -vvv ca_sos_$db
+        fi
+
+    done
+
+    first=`head -1 scripts/years.txt`"-00-00"
+    last=`tail -1 scripts/years.txt`"-12-32"
+
+done
+
+exit

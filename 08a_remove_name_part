@@ -1,0 +1,74 @@
+#!/bin/sh
+
+usage1="    ./08a_remove_name_part -date <YYYYMMDD> ( PREFIX | SUFFIX | MERGE | REPLACE ) <part1> [ <part2> ]\n\n"
+usage2="        for MERGE, part1 will be replaced with part2 and part1 rows will be removed.\n"
+usage3="        for REPLACE, no part2 rows exits, but part1 rows will become part2 rows.\n"
+
+usage=$usage1""$usage2""$usage3
+
+if [ "$1" != "-date" ]; then
+    echo "\n"$usage"\n"
+    exit
+fi
+
+dbDate=$2
+type=$3
+part1=$4
+part2=$5
+
+if [ "$dbDate" = "" ] || [ "$type" = "" ] || [ "$part1" = "" ]; then
+    echo "\n"$usage"\n"
+    exit
+fi
+
+if [ "$type" = "REPLACE" ] && [ "$part2" = "" ]; then
+    echo "\n"$usage"\n"
+    exit
+fi
+
+len=${#part1}
+
+if [ $type = "PREFIX" ]; then
+ 
+    echo "prefix: part = \""$namePart"\", length = "$len
+
+    ( echo "select s1.pk, s1.name, s2.pk, s2.name from named_smooth s1, named_smooth s2 ";
+      echo "where s1.name like '"$namePart"%' and substring(s1.name,"$len") = s2.name;" ) | \
+    mysql --skip-column-names -B ca_sos_$dbDate | \
+    awk 'BEGIN{FS="\t"}{print "update named_uniq set smooth_pk = "$3" where smooth_pk = "$1"; delete from named_smooth where pk = "$1";"}' | \
+    mysql ca_sos_$dbDate
+
+fi
+
+if [ $type = "SUFFIX" ]; then
+
+    echo "suffix: part = \""$namePart"\", length = "${#namePart}
+
+    ( echo "select s1.pk, s1.name, s2.pk, s2.name from named_smooth s1, named_smooth s2 ";
+      echo "where s1.name like '%"$namePart"' and substring(s1.name,1,length(s1.name)-"$len") = s2.name;" ) | \
+    mysql --skip-column-names -B ca_sos_$dbDate | \
+    awk 'BEGIN{FS="\t"}{print "update named_uniq set smooth_pk = "$3" where smooth_pk = "$1"; delete from named_smooth where pk = "$1";"}' | \
+    mysql ca_sos_$dbDate
+
+fi
+
+if [ $type = "MERGE" ]; then
+
+    echo "merge: to be replaced: \""$part1"\", to replace with: \""$part2"\""
+
+    ( echo "select s1.pk, s1.name, s2.pk, s2.name from named_smooth s1, named_smooth s2 ";
+      echo "where s1.name = '"$part1"' and s2.name = '"$part2"';" ) | \
+    mysql --skip-column-names -B ca_sos_$dbDate | \
+    awk 'BEGIN{FS="\t"}{print "update named_uniq set smooth_pk = "$3" where smooth_pk = "$1"; delete from named_smooth where pk = "$1";"}' | \
+    mysql ca_sos_$dbDate
+fi
+
+if [ $type = "REPLACE" ]; then
+
+    echo "replace: to be replaced: \""$part1"\", to replace with: \""$part2"\""
+
+    echo "update named_smooth set name = '"$part2"' where name = '"$part1"';" | mysql --skip-column-names -B ca_sos_$dbDate
+
+fi
+
+exit

@@ -1,0 +1,33 @@
+#!/bin/sh
+
+if [ "$1" != "-date" ] || [ "$2" = "" ]; then
+    echo ""
+    echo "usage: ./09_fill_counts -date <YYYYMMDD>"
+    echo ""
+    exit
+fi
+
+db=$2
+
+echo "adding named_uniq counts to smooth table..."
+date
+
+echo "select pk from named_smooth;" | \
+   mysql --skip-column-names -B ca_sos_$db | 
+   awk '{print "update named_smooth set uniq_count = (select count(0) from named_uniq where smooth_pk = "$0") where pk = "$0";"}' | \
+   mysql ca_sos_$db
+
+date
+
+echo "adding named_count values to smooth table..."
+date
+
+echo "select pk from named_smooth where named_count is NULL;" | \
+   mysql --skip-column-names -B ca_sos_$db |
+   awk '{print "update named_smooth set named_count = (select count(0) from named ";
+         print "   where uniq_pk in (select pk from named_uniq where smooth_pk = "$0")) where pk = "$0";"}' | \
+   mysql ca_sos_$db
+
+date
+
+exit

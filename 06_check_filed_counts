@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-require $ENV{'HOME'}."/open_calaccess_data_perl/scripts/options.pl";
+require "scripts/options.pl";
 
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
@@ -145,7 +145,9 @@ if (defined($bothTables) || defined($filingOnly)) {
                     undef @filingIds;
                 }
             }
-            print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
+            if (defined(@filingIds)) {
+                print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
+            }
         }
         print "\n";
 
@@ -198,7 +200,9 @@ if (defined($bothTables) || defined($filerOnly)) {
                     undef @filerIds;
                 }
             }
-            print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
+            if (defined(@filerIds)) {
+                print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
+            }
         }
         print "\n";
 

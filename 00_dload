@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+
+require "scripts/options.pl";
+
+$verbose = 0;
+$no_orig = 0;
+
+$url = "https://campaignfinance.cdn.sos.ca.gov/dbwebexport.zip";
+# $url = "http://opencalaccess.org/dbwebexport.zip";
+
+for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+    $arg = $ARGV[$idx];
+
+    if ($arg eq "-v") { $verbose = 1; }
+    if ($arg eq "-vv") { $verbose = 2; }
+    if ($arg eq "-date") { $date = $ARGV[$idx+1]; $idx++ }
+}
+
+if ( ! defined($date)) {
+    $date = `date '+%Y%m%d'`;
+    chomp($date);
+}
+
+$data_dir = option("projectDir")."/data_".$date;
+
+print "  option: data_dir: \"".$data_dir."\"\n";
+
+if ( ! -d $data_dir) {
+
+    mkdir $data_dir || die("Cannot create directory: ".$data_dir."\n");
+
+    if ($verbose > 0) { print "Created dir: ".$data_dir."\n"; }
+} else {
+
+    if ($verbose > 0) { print "NOT creating, existing dir: ".$data_dir."\n"; }
+}
+
+if ( ! -f $data_dir."/dbwebexport.zip") {
+
+    $cmd = option("curl")." --silent --output ".$data_dir."/dbwebexport.zip ".$url;
+
+    if ($verbose > 0) { print "Fetching file from SoS...\n"; }
+
+    `$cmd`;
+    if ($? != 0) { die("Error fetching dbwebexport.zip file!"); }
+
+} else {
+
+    if ($verbose > 0) { print "NOT fetching, found file: ".$data_dir."/dbwebexport.zip\n"; }
+}
+
+if ( ! -d $data_dir."/CalAccess") {
+
+    $cmd = "( cd ".$data_dir." ; ".option("unzip")." dbwebexport.zip )";
+
+    if ($verbose > 0) { print "Unzipping db export file...\n"; }
+
+    `$cmd`;
+
+} else {
+    if ($verbose > 0) { print "NOT unzipping, found dir: ".$data_dir."/CalAccess\n"; }
+}
+
