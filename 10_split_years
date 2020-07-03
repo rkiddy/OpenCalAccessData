@@ -48,6 +48,7 @@ do
     do
 
         if [ $add = "yes" ]; then
+
             ( echo "create table "$table"_"$year" like "$table";"
               echo "insert into "$table"_"$year" select * from "$table" where filing_id in"
               echo "  (select filing_id from filer_filings where rpt_start like '"$year"%');" ) | \
@@ -63,9 +64,27 @@ do
         fi
 
     done
+ 
+    if [ $add = "yes" ]; then
 
-    first=`head -1 scripts/years.txt`"-00-00"
-    last=`tail -1 scripts/years.txt`"-12-32"
+        first=`head -1 scripts/years.txt`"-00-00"
+        last=`tail -1 scripts/years.txt`"-12-32"
+
+        ( echo "create table "$table"_before like "$table";"
+          echo "insert into "$table"_before select * from "$table" where filing_id in"
+          echo "  (select filing_id from filer_filings where rpt_start < '"$first"');" ) | \
+        mysql -vvv ca_sos_$db
+
+        ( echo "create table "$table"_later like "$table";"
+          echo "insert into "$table"_before select * from "$table" where filing_id in" 
+          echo "  (select filing_id from filer_filings where rpt_start > '"$last"');" ) | \ 
+        mysql -vvv ca_sos_$db
+
+    fi
+
+    if [ $drop = "yes" ]; then
+        echo "drop table "$table"_later; drop table "$table"_before;" | mysql -vvv ca_sos_$db
+    fi
 
 done
 
