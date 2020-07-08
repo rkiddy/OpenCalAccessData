@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -10,6 +8,8 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg eq "-suffix") { $suffix = $ARGV[$idx+1]; $idx++; next; }
 }
+
+require "scripts/options.pl";
 
 if ( ! defined($importDate)) {
     print "\nPlease give me an import date as a parameter.\n\n";
@@ -27,7 +27,7 @@ $cmd = "echo \"show tables;\" | ".$myQ."_".$importDate." | grep '".$suffix."'";
 @tables = `$cmd`;
 chomp(@tables);
 
-open M, "| ".$myV."_".$importDate;
+open M, "| ".$myV;
 
 foreach (@tables) {
     print M "drop table ".$_.";\n";

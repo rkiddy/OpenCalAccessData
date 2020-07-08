@@ -9,6 +9,12 @@ fi
 
 db=$2
 
+if [ `uname` = "Darwin" ]; then
+    u=""
+else
+    u="-u root --password=root "
+fi
+
 if [ -d /tmp/named ]; then
     /bin/rm -rf /tmp/named
 fi
@@ -20,11 +26,11 @@ echo ""
 echo "set up the data for the named_uniq table"
 echo ""
 
-echo "select naml, namf, namt, nams from named;" | mysql -u root --password=root -B ca_sos_$db 2>dev.null > n1.txt
+echo "select naml, namf, namt, nams from named;" | mysql $u --skip-column-names ca_sos_$db 2>dev.null > n1.txt
 
 sort < n1.txt | sort | awk '{print NR"\t"$0}' > named_uniq
 
-cat <<EOF | mysql -vvv --local-infile -u root --password=root ca_sos_$db 2>/dev/null
+cat <<EOF | mysql $u -vvv --local-infile ca_sos_$db 2>/dev/null
 
 create table `named_uniq` (
   `pk` int(11) DEFAULT NULL,
@@ -44,10 +50,10 @@ echo "recreate the named table with the uniq_pk value"
 echo "
 
 echo "select naml,namf,namt,nams,pk from named_uniq;" | \
-    mysql -u root --password=root -B --skip-column-names ca_sos_$db 2>/dev/null > n1.txt
+    mysql $u --skip-column-names ca_sos_$db 2>/dev/null > n1.txt
 
 echo "select naml,namf,namt,nams,table_name,table_pk,name_type from named;" | \
-    mysql -u root --password=root -B --skip-column-names ca_sos_20200615 2>/dev/null > n2.txt
+    mysql $u --skip-column-names ca_sos_20200615 2>/dev/null > n2.txt
 
 cat n1.txt n2.txt | sort > n3.txt
 
@@ -56,7 +62,7 @@ awk 'BEGIN{FS="\t"}{if (NF == 4) fk=$4;
 
 split --lines=10000 --suffix-length=4 n4.txt n4_
 
-cat <<EOF | mysql -vvv -u root --password=root ca_sos_$db 2>/dev/null
+cat <<EOF | mysql $u -vvv ca_sos_$db 2>/dev/null
 
 rename table named to named_bak;
 create table `named` (
@@ -68,19 +74,19 @@ create table `named` (
   `namt` varchar(10) COLLATE utf8mb4_bin DEFAULT NULL,
   `nams` varchar(10) COLLATE utf8mb4_bin DEFAULT NULL,
   `names_pk` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8_general_cs;
 
 EOF
 
 /bin/ls -1 n4_* | \
     awk '{print "cp "$0" named";
           print "echo \"load data local infile '\''/tmp/named/named'\'' into table named;\" | \\";
-          print "mysql -u root --password=root --local-infile ca_sos_'$db'"}' | /bin/sh 2>/dev/null
+          print "mysql '$u' --local-infile ca_sos_'$db'"}' | /bin/sh 2>/dev/null
 
 
 # /bin/rm -rf /tmp/named
 
-cat <<EOF | mysql -vvv ca_sos_$db
+cat <<EOF | mysql $u -vvv ca_sos_$db
   alter table named_uniq add column smooth_pk int;
   alter table named_uniq add column smoothed varchar(299);
   create table named_smooth (pk int, name varchar(299), uniq_count int, named_count int, linked_to_pk int);
@@ -91,7 +97,7 @@ echo "creating smoothed strings..."
 date
 
 echo "select pk,concat(namf,' ',naml,' ',namt,' ',nams) from named_uniq;" | \
-    mysql --skip-column-names -B ca_sos_$db | \
+    mysql $u --skip-column-names ca_sos_$db | \
     tr '[A-Z]' '[a-z]' | \
     sed 's/[\.\,'\'']//g' | \
     sed 's/ $//g' | \
@@ -99,11 +105,11 @@ echo "select pk,concat(namf,' ',naml,' ',namt,' ',nams) from named_uniq;" | \
     sed 's/^ *//' | \
     sed 's/  */ /g' | \
     awk 'BEGIN{FS="\t"}{print "update named_uniq set smoothed = '\''"$1"'\'' where pk = "$2";"}' | \
-    mysql ca_sos_$db
+    mysql $u ca_sos_$db
 
 date
 
-cat <<EOF | mysql -vvv ca_sos_$db
+cat <<EOF | mysql $u -vvv ca_sos_$db
   replace into named_smooth (name) select smoothed from named_uniq;
   update named_smooth cross join (select @pk:=0) as init set named_smooth.pk=@pk:=@pk+1;
   alter table named_uniq add index (smoothed);
@@ -114,13 +120,13 @@ echo "setting smooth_pk back in uniq table..."
 date
 
 echo "select pk, name from named_smooth;" | \
-    mysql --skip-column-names -B ca_sos_$db | \
+    mysql $u --skip-column-names ca_sos_$db | \
     awk 'BEGIN{FS="\t"}{print "update named_uniq set smooth_pk = "$1" where smoothed = '\''"$2"'\'';"}' | \
-    mysql ca_sos_$db
+    mysql $u ca_sos_$db
 
 date
 
-cat <<EOF | mysql -vvv ca_sos_$db
+cat <<EOF | mysql $u -vvv ca_sos_$db
     alter table named_uniq drop column smoothed;
     alter table named_uniq add index (smooth_pk);
 EOF

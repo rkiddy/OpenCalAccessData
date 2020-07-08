@@ -1,0 +1,36 @@
+
+# move/rename me to ~/.opencalaccess
+
+# options file
+# a b becomes option{a} => b;
+#
+
+# Defining executable paths here so that this can run on different platforms.
+#
+head /usr/bin/head
+cat /bin/cat
+diff /usr/bin/diff
+grep /bin/grep
+curl /usr/bin/curl
+unzip /usr/bin/unzip
+gzip /bin/gzip
+find /usr/bin/find
+tr /usr/bin/tr
+perl /usr/bin/perl
+
+
+# Platform-specific file system paths
+#
+tmpDir /tmp
+
+# User-specific information
+#
+dbName ca_sos
+dbUser root
+dbPwd root
+
+mysql /usr/bin/mysql
+
+projectDir /home/ubuntu
+dataDir /home/ubuntu
+

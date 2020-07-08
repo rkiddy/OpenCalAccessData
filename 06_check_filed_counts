@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -11,6 +9,8 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-fileronly") { $filerOnly = 1; }
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
 }
+
+require "scripts/options.pl";
 
 if ( ! defined($importDate)) {
     print "\nPlease give me an import date as a parameter.\n\n";
@@ -28,8 +28,8 @@ if (defined($dryrun)) {
     $pipeDBv = "| cat -";
     $pipeDBq = "| cat -";
 } else {
-    $pipeDBv = "| ".$myVF."_".$importDate;
-    $pipeDBq = "| ".$myQF."_".$importDate;
+    $pipeDBv = "| ".$myVF;
+    $pipeDBq = "| ".$myQF;
 }
 
 #

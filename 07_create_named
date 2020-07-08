@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -16,7 +14,8 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-all") { $allTables = 1; }
 
     if ($arg !~ /\-/) { $tables{$arg} = 1; }
-}
+
+require "scripts/options.pl";
 
 $usage = "\nusage: ./07_create -date <YYYYMMDD> [ -start <table> ]\n\n";
 
@@ -32,7 +31,7 @@ if ( ! defined($allTables) && scalar(%tables) == 0) { print $usage; exit(0); }
 if ( ! defined($inc)) { $inc = 100000; }
 
 if ( ! defined($dryRun)) {
-    open M, "| ".$myV."_".$importDate;
+    open M, "| ".$myV;
 } else {
     open M, "| cat -";
 }
@@ -65,7 +64,7 @@ while (<T>) {
         $tableName = $line;
 
         if (defined($allTables) || defined($tables{$tableName})) {
-            $cmd = "echo \"select max(pk) from ".$tableName.";\" | ".$myQ."_".$importDate;
+            $cmd = "echo \"select max(pk) from ".$tableName.";\" | ".$myQ;
             $pk = `$cmd`;
             chomp($pk);
         }
@@ -92,7 +91,7 @@ while (<T>) {
                     close M;
 
                     if ( ! defined($dryRun)) {
-                        open M, "| ".$myV."_".$importDate;
+                        open M, "| ".$myV;
                     } else {
                         open M, "| cat -";
                     }
@@ -103,6 +102,8 @@ while (<T>) {
         }
     }
 }
+
+close T;
 
 print M "alter table named add index(naml(20));\n";
 

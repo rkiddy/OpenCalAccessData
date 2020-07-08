@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -19,6 +17,8 @@ for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg !~ /^\-/) { $tables{$arg} = 1; }
 }
+
+require "scripts/options.pl";
 
 if (scalar(@ARGV) == 0 || ! defined($importDate)) {
     print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> )\n\n";
@@ -71,18 +71,18 @@ print "\ntables count = ".(scalar(keys %tables))."\n\n";
 
 foreach (sort keys %tables) {
 
+    $table = $_;
+
     if (defined($dryrun)) {
         open M, "| cat";
     } else {
-        open M, "| ".$myV."_".$importDate;
+        open M, "| ".$myV;
     }
 
     print M "set max_error_count = 65535;\n";
 
     print M "SET GLOBAL sql_mode='ONLY_FULL_GROUP_BY,NO_ZERO_IN_DATE,NO_ZERO_DATE,".
                                  "ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';\n";
-
-    $table = $_;
 
     $cmd = "echo \"select max(pk) from ".$table."_cd;\" | ".$myQ."_".$importDate;
     $pk = `$cmd`;
@@ -115,6 +115,11 @@ foreach (sort keys %tables) {
         }
         if ($colTypes{$table}[$idx] eq "datetime") {
             print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
+        }
+        if ($columns{$table}[$idx] ne "high_amend_id") {
+            if ($colTypes{$table}[$idx] eq "int") {
+                print M "update ".$table."_cd set ".$columns{$table}[$idx]." = '0' where ".$columns{$table}[$idx]." = '';\n";
+            }
         }
         if ($columns{$table}[$idx] eq "filing_id") {
             print M "alter table ".$table." add index(filing_id);\n";
@@ -151,6 +156,8 @@ foreach (sort keys %tables) {
         print M "from ".$table."_cd ";
         print M "where pk = ".$pkOnly.";\n";
 
+        print M "show warnings;\n";
+
     } else {
 
         for ($idx = 0; $idx <= $pk; $idx = $idx + $inc) {
@@ -162,9 +169,21 @@ foreach (sort keys %tables) {
             print M "from ".$table."_cd ";
             print M "where pk > ".$idx." and pk <= ".($idx+$inc).";\n";
 
-            if (defined($verbose)) { print M "show warnings;\n"; }
+            print M "show warnings;\n";
         }
     }
+
+    close M;
+
+
+    open M, "| ".&option("mysql").$u." -vvv --local-infile ".&option("dbName")."_all";
+
+    print M "load data infile '/tmp/import_logs.txt' into table import_logs lines terminated by '___XYZZY___';\n";
+
+    print M "insert into imports (log_pk, db_name, table_name, when_imported) values ";
+    print M "    ((select max(pk) from import_logs), '".&option("dbName")."_".$importDate."', '".$table."', now());\n";
+
+    print M "quit\n";
 
     close M;
 }

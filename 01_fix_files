@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 $usage = "\nusage: ./01_fix_files [ -date <YYYYMMDD> ] ( -all | <files> )\n\n";
 
 $verbose = 0;
@@ -23,6 +21,8 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
 
     if ($arg !~ /^\-/) { $files{$arg} = 1; }
 }
+
+require "scripts/options.pl";
 
 sub remove_field {
     $toRemove = shift;

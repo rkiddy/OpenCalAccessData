@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 $verbose = 0;
 $no_orig = 0;
 
@@ -20,6 +18,8 @@ if ( ! defined($date)) {
     $date = `date '+%Y%m%d'`;
     chomp($date);
 }
+
+require "scripts/options.pl";
 
 $data_dir = option("projectDir")."/data_".$date;
 

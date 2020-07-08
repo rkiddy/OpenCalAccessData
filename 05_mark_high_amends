@@ -1,13 +1,13 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
-
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
     if ($arg !~ /^\-/) { $tables{$_} = 1; }
 }
+
+require "scripts/options.pl";
 
 if ( ! defined($importDate)) {
     print "\nusage: ./05_mark_high_amends -date <YYYYMMDD> [ <tables> ]\n\n";
@@ -48,7 +48,7 @@ if ( ! defined($foundHighAmend)) {
     print `$cmd`;
 }
 
-open M, "| ".$myV."_".$importDate;
+open M, "| ".$myV;
 
 foreach (sort keys %tables) {
     $table = $_;
@@ -60,6 +60,11 @@ foreach (sort keys %tables) {
 
     print "\n";
 }
+
+print M "delete from filer_filings where high_amend_id != filing_sequence;\n";
+
+# Theoretically, I could go to all of the tables and remove all of the rows where the filing_id/amend_id do not match the highest.
+# This would save some space....
 
 close M;
 

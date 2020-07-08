@@ -1,6 +1,8 @@
 #!/usr/bin/perl
 
-require "scripts/options.pl";
+$usage1 = "\nusage: ./01_import -date <YYYYMMDD> ( -all | <files> )\n\n";
+$usage2 = "    File names should be all in UPPER case.\n\n";
+$usage3 = "    eg, % ./02_import_cds -date 20200615 FILER_FILINGS_CD.TSV_FIXED\n\n";
 
 sub tableNameFromFile {
     @p = split '/', $_;
@@ -12,7 +14,7 @@ sub tableNameFromFile {
 }
 
 if (scalar(@ARGV) == 0) {
-    print "\nusage: ./01_import -date <YYYYMMDD> ( -all | <files> )\n\n";
+    print $usage1.$usage2.$usage3;
     exit(0);
 }
 
@@ -35,6 +37,8 @@ if ( ! defined($import_date)) {
     print "\nNo -date parameter given.\n\n";
     exit(0);
 }
+
+require "scripts/options.pl";
 
 $data_dir = "data_".$import_date;
 
@@ -61,7 +65,7 @@ if ( ! defined($allFiles) && scalar(@files) == 0 && $noFiles != 1) {
 
 if (&db_exists(option("dbName")."_".$import_date) == 0) {
 
-    $cmd = "create database ".option("dbName")."_".$import_date." character set utf8mb4 collate utf8_general_ci;\n";
+    $cmd = "create database ".option("dbName")."_".$import_date." character set utf8mb4 collate utf8_general_cs;\n";
 
     open M, "| ".$myNo;
 
@@ -74,7 +78,7 @@ if (&db_exists(option("dbName")."_".$import_date) == 0) {
     if ($verbose > 0) { print "Created database with name: ".option("dbName")."_".$import_date."\n\n"; }
 }
 
-open M, "| ".$myV."_".$import_date;
+open M, "| ".$myV;
 
 print M "SET GLOBAL local_infile = 'ON';\n";
 
@@ -119,7 +123,7 @@ close M;
 
 if ($createOnly > 0) { exit(0); }
 
-open M, "| ".$myV."_".$import_date;
+open M, "| ".$myV;
 
 print M "SET GLOBAL local_infile = 'ON';\n";
 
@@ -203,7 +207,7 @@ foreach (@files) {
     close SQL_IN;
     close SQL_OUT;
 
-    open M, "| ".option("mysql")." -vvv --local-infile ".option("dbName")."_".$import_date;
+    open M, "| ".$myV;
 
     print M "set max_error_count=65535;\n";
 
