@@ -34,10 +34,10 @@ cat <<EOF | mysql $u -vvv --local-infile ca_sos_$db 2>/dev/null
 
 create table `named_uniq` (
   `pk` int(11) DEFAULT NULL,
-  `naml` varchar(200) COLLATE utf8mb4_bin DEFAULT NULL,
-  `namf` varchar(45) COLLATE utf8mb4_bin DEFAULT NULL,
-  `namt` varchar(10) COLLATE utf8mb4_bin DEFAULT NULL,
-  `nams` varchar(10) COLLATE utf8mb4_bin DEFAULT NULL
+  `naml` varchar(200) DEFAULT NULL,
+  `namf` varchar(45) DEFAULT NULL,
+  `namt` varchar(10) DEFAULT NULL,
+  `nams` varchar(10) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 load data local infile '/tmp/named/named_uniq' into table named_uniq;
@@ -66,15 +66,15 @@ cat <<EOF | mysql $u -vvv ca_sos_$db 2>/dev/null
 
 rename table named to named_bak;
 create table `named` (
-  `table_name` varchar(40) COLLATE utf8mb4_bin NOT NULL,
+  `table_name` varchar(40) NOT NULL,
   `table_pk` int(11) NOT NULL,
-  `name_type` varchar(6) COLLATE utf8mb4_bin NOT NULL,
-  `naml` varchar(200) COLLATE utf8mb4_bin DEFAULT NULL,
-  `namf` varchar(45) COLLATE utf8mb4_bin DEFAULT NULL,
-  `namt` varchar(10) COLLATE utf8mb4_bin DEFAULT NULL,
-  `nams` varchar(10) COLLATE utf8mb4_bin DEFAULT NULL,
+  `name_type` varchar(6) NOT NULL,
+  `naml` varchar(200) DEFAULT NULL,
+  `namf` varchar(45) DEFAULT NULL,
+  `namt` varchar(10) DEFAULT NULL,
+  `nams` varchar(10) DEFAULT NULL,
   `names_pk` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8_general_cs;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 EOF
 

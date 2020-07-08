@@ -65,7 +65,7 @@ if ( ! defined($allFiles) && scalar(@files) == 0 && $noFiles != 1) {
 
 if (&db_exists(option("dbName")."_".$import_date) == 0) {
 
-    $cmd = "create database ".option("dbName")."_".$import_date." character set utf8mb4 collate utf8_general_cs;\n";
+    $cmd = "create database ".option("dbName")."_".$import_date." character set utf8mb4 collate utf8mb4_bin;\n";
 
     open M, "| ".$myNo;
 
