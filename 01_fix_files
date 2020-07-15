@@ -259,7 +259,7 @@ if ($verbose > 0) {
     }
 }
 
-if ( ! defined($date) && ( ! defined($allFiles) && scalar(keys %files) == 0)) {
+if ( ! defined($date) || ( ! defined($allFiles) && scalar(keys %files) == 0)) {
     print $usage;
     exit(0);
 }
