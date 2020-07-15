@@ -4,6 +4,8 @@ $usage1 = "\nusage: ./01_import -date <YYYYMMDD> ( -all | <files> )\n\n";
 $usage2 = "    File names should be all in UPPER case.\n\n";
 $usage3 = "    eg, % ./02_import_cds -date 20200615 FILER_FILINGS_CD.TSV_FIXED\n\n";
 
+require "scripts/options.pl";
+
 sub tableNameFromFile {
     @p = split '/', $_;
     $t = pop @p;
@@ -28,19 +30,19 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-all") { $allFiles = 1; }
     if ($arg eq "-none") { $noFiles = 1; }
     if ($arg eq "--create-only") { $createOnly = 1; }
-    if ($arg eq "-date") { $import_date = $ARGV[$idx+1]; $idx++; next; }
+    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
     if ($arg =~ /\.TSV_FIXED$/) { push @files, $arg; }
     if ($arg eq "-v") { $verbose = 1; }
 }
 
-if ( ! defined($import_date)) {
+if ( ! defined($importDate)) {
     print "\nNo -date parameter given.\n\n";
     exit(0);
 }
 
-require "scripts/options.pl";
+&set_up_options($importDate);
 
-$data_dir = "data_".$import_date;
+$data_dir = "data_".$importDate;
 
 if (defined($allFiles)) {
     $cmd = option("find")." ".$data_dir."/CalAccess -name \\*_CD.TSV_FIXED";
@@ -63,9 +65,17 @@ if ( ! defined($allFiles) && scalar(@files) == 0 && $noFiles != 1) {
     print "\n";
 }
 
-if (&db_exists(option("dbName")."_".$import_date) == 0) {
+$databaseExists = "no";
+$cmd = "echo \"show databases;\" | ".$my;
+@dbs = `$cmd`;
+chomp(@dbs);
+foreach (@dbs) {
+    if ($_ eq $dbName) { $databaseExists = "yes"; }
+}
 
-    $cmd = "create database ".option("dbName")."_".$import_date." character set utf8mb4 collate utf8mb4_bin;\n";
+if ($databaseExists eq "no") {
+
+    $cmd = "create database ".option("dbName")."_".$importDate." character set utf8mb4 collate utf8mb4_bin;\n";
 
     open M, "| ".$myNo;
 
@@ -75,7 +85,7 @@ if (&db_exists(option("dbName")."_".$import_date) == 0) {
 
     close M;
 
-    if ($verbose > 0) { print "Created database with name: ".option("dbName")."_".$import_date."\n\n"; }
+    if ($verbose > 0) { print "Created database with name: ".option("dbName")."_".$importDate."\n\n"; }
 }
 
 open M, "| ".$myV;
@@ -90,7 +100,7 @@ foreach (@files) {
      #
      $table = &tableNameFromFile($file);
 
-     if ($file !~ /^data_/) { $file = "data_".$import_date."/CalAccess/DATA/".$file; }
+     if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
 
      print "testing for file: \"".$file."\"\n";
 
@@ -131,7 +141,7 @@ foreach (@files) {
 
     $file = $_;
 
-    if ($file !~ /^data_/) { $file = "data_".$import_date."/CalAccess/DATA/".$file; }
+    if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
 
     # Given "TEXT_MEMO_CD.TSV" in the data directory, this will now be "text_memo_cd".
     #

@@ -11,6 +11,12 @@ db=$2
 
 shift 2
 
+if [ `uname` = "Darwin" ]; then
+    u=""
+else
+    u="-u root --password=root "
+fi
+
 if [ "$1" = "-drop" ]; then
     drop="yes"
     shift 1
@@ -52,15 +58,15 @@ do
             ( echo "create table "$table"_"$year" like "$table";"
               echo "insert into "$table"_"$year" select * from "$table" where filing_id in"
               echo "  (select filing_id from filer_filings where rpt_start like '"$year"%');" ) | \
-            mysql -vvv ca_sos_$db
+            mysql $u -vvv ca_sos_$db
         fi
 
         if [ $drop = "yes" ]; then
-            echo "drop table "$table"_"$year";" | mysql -vvv ca_sos_$db
+            echo "drop table "$table"_"$year";" | mysql $u -vvv ca_sos_$db
         fi
 
         if [ $combine = "yes" ]; then
-            echo "" | mysql -vvv ca_sos_$db
+            echo "" | mysql $u -vvv ca_sos_$db
         fi
 
     done
@@ -73,17 +79,17 @@ do
         ( echo "create table "$table"_before like "$table";"
           echo "insert into "$table"_before select * from "$table" where filing_id in"
           echo "  (select filing_id from filer_filings where rpt_start < '"$first"');" ) | \
-        mysql -vvv ca_sos_$db
+        mysql $u -vvv ca_sos_$db
 
         ( echo "create table "$table"_later like "$table";"
           echo "insert into "$table"_before select * from "$table" where filing_id in" 
           echo "  (select filing_id from filer_filings where rpt_start > '"$last"');" ) | \ 
-        mysql -vvv ca_sos_$db
+        mysql $u -vvv ca_sos_$db
 
     fi
 
     if [ $drop = "yes" ]; then
-        echo "drop table "$table"_later; drop table "$table"_before;" | mysql -vvv ca_sos_$db
+        echo "drop table "$table"_later; drop table "$table"_before;" | mysql $u -vvv ca_sos_$db
     fi
 
 done

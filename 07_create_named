@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+require "scripts/options.pl";
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -14,21 +16,17 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-all") { $allTables = 1; }
 
     if ($arg !~ /\-/) { $tables{$arg} = 1; }
-
-require "scripts/options.pl";
+}
 
 $usage = "\nusage: ./07_create -date <YYYYMMDD> [ -start <table> ]\n\n";
 
 if ( ! defined($importDate)) { print $usage; exit(0); }
 
-if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
-    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
-    exit(1);
-}
-
 if ( ! defined($allTables) && scalar(%tables) == 0) { print $usage; exit(0); }
 
 if ( ! defined($inc)) { $inc = 100000; }
+
+&set_up_options($importDate);
 
 if ( ! defined($dryRun)) {
     open M, "| ".$myV;

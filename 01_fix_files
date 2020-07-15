@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
-$usage = "\nusage: ./01_fix_files [ -date <YYYYMMDD> ] ( -all | <files> )\n\n";
+$usage = "\nusage: ./01_fix_files [ -date <YYYYMMDD> ] ( -all | <files> )\n\n".
+         "This script looks at each TSV file and creates a TSV_FIXES file for it.\n\n";
 
 $verbose = 0;
 $no_orig = 0;

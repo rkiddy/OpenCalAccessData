@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+require "scripts/options.pl";
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -9,21 +11,16 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-suffix") { $suffix = $ARGV[$idx+1]; $idx++; next; }
 }
 
-require "scripts/options.pl";
-
 if ( ! defined($importDate)) {
     print "\nPlease give me an import date as a parameter.\n\n";
     exit(0);
 }
 
-if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
-    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
-    exit(1);
-}
+&set_up_options($importDate);
 
 if ( ! defined($suffix)) { $suffix = "_cd"; }
 
-$cmd = "echo \"show tables;\" | ".$myQ."_".$importDate." | grep '".$suffix."'";
+$cmd = "echo \"show tables;\" | ".$myQ." | grep '".$suffix."'";
 @tables = `$cmd`;
 chomp(@tables);
 

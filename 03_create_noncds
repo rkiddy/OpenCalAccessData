@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+require "scripts/options.pl";
+
 for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -18,27 +20,22 @@ for (my $idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg !~ /^\-/) { $tables{$arg} = 1; }
 }
 
-require "scripts/options.pl";
-
 if (scalar(@ARGV) == 0 || ! defined($importDate)) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> )\n\n";
+    print "\nusage: ./03_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> )\n\n";
     exit(0);
 }
 
-if (&db_exists(&option("dbName")."_".$importDate) != 1) {
-    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
-    exit(1);
-}
-
 if ( ! defined($allTables) && (scalar(keys %tables)) == 0) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> ) - please use -all or a list of tables\n\n";
+    print "\nusage: ./03_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> ) - please use -all or a list of tables\n\n";
     exit(0);
 }
 
 if (defined($allTables) && (scalar(keys %tables)) > 0) {
-    print "\nusage: ./02_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> ) - do not use -all and list files on the command line\n\n";
+    print "\nusage: ./03_create_final -date <YYYYMMDD> [ -v ] [ -dryrun ] [ -inc <#> ] ( -all | <tables> ) - do not use -all and list files on the command line\n\n";
     exit(0);
 }
+
+&set_up_options($importDate);
 
 if ( ! defined($inc)) { $inc = 10000; }
 
@@ -84,7 +81,7 @@ foreach (sort keys %tables) {
     print M "SET GLOBAL sql_mode='ONLY_FULL_GROUP_BY,NO_ZERO_IN_DATE,NO_ZERO_DATE,".
                                  "ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';\n";
 
-    $cmd = "echo \"select max(pk) from ".$table."_cd;\" | ".$myQ."_".$importDate;
+    $cmd = "echo \"select max(pk) from ".$table."_cd;\" | ".$myQ;
     $pk = `$cmd`;
     chomp($pk);
 

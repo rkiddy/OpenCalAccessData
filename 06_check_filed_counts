@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+require "scripts/options.pl";
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -10,17 +12,12 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
 }
 
-require "scripts/options.pl";
-
 if ( ! defined($importDate)) {
     print "\nPlease give me an import date as a parameter.\n\n";
     exit(0);
 }
 
-if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
-    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
-    exit(1);
-}
+&set_up_options($importDate);
 
 if ( ! defined($filingOnly) && ! defined($filerOnly)) { $bothTables = 1; }
 
@@ -61,6 +58,8 @@ delete $filingsTables{"filings"};
 
 open M, $pipeDBv;
 
+print M "set max_error_count = 65535;\n";
+
 if (defined($bothTables) || defined($filingOnly)) {
     print M "drop table if exists filings_counted;\n";
     print M "create table filings_counted (\n";
@@ -95,12 +94,14 @@ open M, $pipeDBv;
 if (defined($bothTables) || defined($filingOnly)) {
     foreach (sort keys %filingsTables) {
         print M "insert ignore into filings_counted (filing_id) select filing_id from ".$_.";\n";
+        print M "show warnings;\n";
     }
 }
 
 if (defined($bothTables) || defined($filerOnly)) {
     foreach (sort keys %filersTables) {
         print M "insert ignore into filers_counted (filer_id) select filer_id from ".$_.";\n";
+        print M "show warnings;\n";
     }
 }
 
@@ -116,7 +117,7 @@ if (defined($bothTables) || defined($filingOnly)) {
         undef %filingCounts;
         undef %filings;
 
-        $cmd = "echo \"select filing_id, count(*) from ".$table." group by filing_id;\" | ".$myQF."_".$importDate;
+        $cmd = "echo \"select filing_id, count(*) from ".$table." group by filing_id;\" | ".$myQF;
         @ids = `$cmd`;
         chomp(@ids);
         #print "ids # ".scalar(@ids)."\n";
@@ -145,7 +146,7 @@ if (defined($bothTables) || defined($filingOnly)) {
                     undef @filingIds;
                 }
             }
-            if (defined(@filingIds)) {
+            if (scalar(@filingIds) > 0) {
                 print M "update filings_counted set ".$table." = ".$count." where filing_id in (".(join ",", @filingIds).");\n";
             }
         }
@@ -171,7 +172,7 @@ if (defined($bothTables) || defined($filerOnly)) {
         undef %filerCounts;
         undef %filers;
 
-        $cmd = "echo \"select filer_id, count(*) from ".$table." group by filer_id;\" | ".$myQF."_".$importDate;
+        $cmd = "echo \"select filer_id, count(*) from ".$table." group by filer_id;\" | ".$myQF;
         @ids = `$cmd`;
         chomp(@ids);
         #print "ids # ".scalar(@ids)."\n";
@@ -200,7 +201,7 @@ if (defined($bothTables) || defined($filerOnly)) {
                     undef @filerIds;
                 }
             }
-            if (defined(@filerIds)) {
+            if (scalar(@filerIds) > 0) {
                 print M "update filers_counted set ".$table." = ".$count." where filer_id in (".(join ",", @filerIds).");\n";
             }
         }

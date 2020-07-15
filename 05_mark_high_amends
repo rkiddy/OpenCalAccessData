@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+require "scripts/options.pl";
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     $arg = $ARGV[$idx];
 
@@ -7,17 +9,12 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg !~ /^\-/) { $tables{$_} = 1; }
 }
 
-require "scripts/options.pl";
-
 if ( ! defined($importDate)) {
     print "\nusage: ./05_mark_high_amends -date <YYYYMMDD> [ <tables> ]\n\n";
     exit(0);
 }
 
-if (&db_exists(&option("dbName")."_".$importDate) != 1) { 
-    print "\nERROR: database \"".&option("dbName")."_".$importDate."\" does not exist.\n";
-    exit(1);
-}
+&set_up_options($importDate);
 
 if ( ! defined(%tables)) {
     open T, "scripts/tableCols.txt";
@@ -34,7 +31,7 @@ delete $tables{"filings"};
 print "%tables:\n";
 foreach (sort keys %tables) { print "    ".$_."\n"; }
 
-$cmd = "echo \"desc filer_filings;\" | ".$myQ."_".$importDate;
+$cmd = "echo \"desc filer_filings;\" | ".$myQ;
 @cols = `$cmd`;
 
 foreach (@cols) {
@@ -44,7 +41,7 @@ foreach (@cols) {
 
 if ( ! defined($foundHighAmend)) {
     print "\nNo high_amend_id column. Altering table...";
-    $cmd = "echo \"alter table filer_filings add column high_amend_id int after filing_id;\" | ".$myV."_".$importDate;
+    $cmd = "echo \"alter table filer_filings add column high_amend_id int after filing_id;\" | ".$myV;
     print `$cmd`;
 }
 

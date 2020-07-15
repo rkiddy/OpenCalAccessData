@@ -26,39 +26,44 @@ sub option {
     return $option{$_[0]};
 }
 
-if (&option("host") eq "mac") {
+sub set_up_options {
 
-    $my = option("mysql")." --local-infile ".&option("dbName")."_".$import_date;
-    $myV = option("mysql")." -vvv --local-infile ".&option("dbName")."_".$import_date;
-    $myVF = option("mysql")." -vvv --local-infile --force ".&option("dbName")."_".$import_date;
-    $myQ = option("mysql")." --skip-column-names --local-infile ".&option("dbName")."_".$import_date;
-    $myQF = option("mysql")." --skip-column-names --local-infile --force ".&option("dbName")."_".$import_date;
-    $myNo = option("mysql");
-}
+    $date = $_[0];
 
-if (&option("host") eq "aws") {
+    if (&option("host") eq "mac") {
 
-    $u = " -u ".option("dbUser")." --password=".option("dbPwd");
+        $my = option("mysql")." --local-infile ".&option("dbName")."_".$date;
+        $myV = option("mysql")." -vvv --local-infile ".&option("dbName")."_".$date;
+        $myVF = option("mysql")." -vvv --local-infile --force ".&option("dbName")."_".$date;
+        $myQ = option("mysql")." --skip-column-names --local-infile ".&option("dbName")."_".$date;
+        $myQF = option("mysql")." --skip-column-names --local-infile --force ".&option("dbName")."_".$date;
+        $myNo = option("mysql");
+    }
 
-    $my = option("mysql").$u." --local-infile ".&option("dbName")."_".$import_date;
-    $myV = option("mysql").$u." -vvv --local-infile ".&option("dbName")."_".$import_date;
-    $myVF = option("mysql").$u." -vvv --local-infile --force ".&option("dbName")."_".$import_date;
-    $myQ = option("mysql").$u." --skip-column-names --local-infile ".&option("dbName")."_".$import_date;
-    $myQF = option("mysql").$u." --skip-column-names --local-infile --force ".&option("dbName")."_".$import_date;
-    $myNo = option("mysql").$u;
+    if (&option("host") eq "aws") {
+
+        $u = " -u ".option("dbUser")." --password=".option("dbPwd");
+
+        $my = option("mysql").$u." --local-infile ".&option("dbName")."_".$date;
+        $myV = option("mysql").$u." -vvv --local-infile ".&option("dbName")."_".$date;
+        $myVF = option("mysql").$u." -vvv --local-infile --force ".&option("dbName")."_".$date;
+        $myQ = option("mysql").$u." --skip-column-names --local-infile ".&option("dbName")."_".$date;
+        $myQF = option("mysql").$u." --skip-column-names --local-infile --force ".&option("dbName")."_".$date;
+        $myNo = option("mysql").$u;
+    }
 }
 
 $no2 = "2>/dev/null";
 
-sub db_exists {
-    $dbName = $_[0];
-    $cmd = "echo \"show databases;\" | ".$my;
-    @dbs = `$cmd`;
-    chomp(@dbs);
-    foreach (@dbs) {
-        if ($_ eq $dbName) { return 1; }
-    }
-    return 0;
-}
+#sub db_exists {
+#    $dbName = $_[0];
+#    $cmd = "echo \"show databases;\" | ".$my;
+#    @dbs = `$cmd`;
+#    chomp(@dbs);
+#    foreach (@dbs) {
+#        if ($_ eq $dbName) { return 1; }
+#    }
+#    return 0;
+#}
 
 1;

@@ -12,6 +12,13 @@ for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
     if ($arg eq "-v") { $verbose = 1; }
     if ($arg eq "-vv") { $verbose = 2; }
     if ($arg eq "-date") { $date = $ARGV[$idx+1]; $idx++ }
+    if ($arg eq "-h" || $arg eq "-help" || $arg eq "--help") { $help = 1; }
+}
+
+if (defined($help)) {
+    print "\n./00_dload [ -v | -vv ] [ -date <YYMMDD> ]\n\n";
+    print "This script just downloads the daily drop from the Secretary of State and then unzips the files.\n\n";
+    exit(0);
 }
 
 if ( ! defined($date)) {

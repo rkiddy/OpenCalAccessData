@@ -7,13 +7,19 @@ if [ "$1" != "-date" ]; then
     exit
 fi
 
+if [ `uname` = "Darwin" ]; then
+    u=""
+else
+    u="-u root --password=root "
+fi
+
 if [ "$3" != "-report" ]; then
     echo "select pk, 'ca_sos_20200615', problem_query from problem_queries;" | \
-       mysql --skip-column-names ca_sos_$2 | \
+       mysql $u --skip-column-names ca_sos_$2 | \
        awk 'BEGIN{FS="\t"}
             {print "replace into problems (database_name,when_checked,problems_num,problem_query_pk) values ";
              print "('\''"$2"'\'', now(), ("$3"), "$1");"}' | \
-       mysql -vvv ca_sos_$2
+       mysql $u -vvv ca_sos_$2
 fi
 
 echo ""
@@ -21,12 +27,12 @@ echo "Counts:"
 echo ""
 ( echo "select table_name, column_names, when_checked, problems_num from problem_queries p1, problems p2 ";
   echo "where database_name = 'ca_sos_"$2"' and p1.pk = p2.problem_query_pk and p1.column_names is NULL order by table_name, column_names;"
-) | mysql --table ca_sos_$2
+) | mysql $u --table ca_sos_$2
 
 echo ""
 echo "Problems:"
 echo ""
 ( echo "select table_name, column_names, when_checked, problems_num from problem_queries p1, problems p2 ";
   echo "where database_name = 'ca_sos_"$2"' and p1.pk = p2.problem_query_pk and p1.column_names is not NULL order by table_name, column_names;"
-) | mysql --table ca_sos_$2
+) | mysql $u --table ca_sos_$2
 

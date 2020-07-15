@@ -1,0 +1,99 @@
+#!/bin/sh
+
+if [ "$1" != "-date" ] || [ "$2" = "" ]; then
+    echo ""
+    echo "usage: ./08_create_named_uniq -date <YYYYMMDD>"
+    echo ""
+    exit
+fi
+
+db=$2
+
+if [ `uname` = "Darwin" ]; then
+    u=""
+else
+    u="-u root --password=root "
+fi
+
+cat <<EOF | mysql $u -vvv ca_sos_$db
+
+  alter table named_uniq add column smooth_pk int;
+
+  alter table named_uniq add column smoothed varchar(299);
+
+  create table named_smooth (pk int, name varchar(299), uniq_count int, named_count int, linked_to_pk int);
+
+  alter table named_smooth add unique (name);
+
+EOF
+
+echo ""
+echo "creating smoothed strings..."
+date
+
+echo "select pk,concat(namf,' ',naml,' ',namt,' ',nams) from named_uniq;" | \
+    mysql $u --skip-column-names ca_sos_$db | \
+    tr '[A-Z]' '[a-z]' | \
+    sed 's/[\.\,'\'']//g' | \
+    sed 's/ $//g' | \
+    awk 'BEGIN{FS="\t"}{print $2"\t"$1}' | \
+    sed 's/^ *//' | \
+    sed 's/  */ /g' | \
+    awk 'BEGIN{FS="\t"}{print "update named_uniq set smoothed = '\''"$1"'\'' where pk = "$2";"}' | \
+    mysql $u ca_sos_$db
+
+date
+
+cat - <<EOF | mysql $u -vvv ca_sos_$db
+
+drop procedure if exists SetUniqIntoSmoothed;
+
+delimiter $$
+
+create procedure SetUniqIntoSmoothed()
+begin
+    
+    declare max int;
+    declare idx int default 0;
+
+    select max(pk) into max from named_uniq;
+
+    while idx <= max do
+        select idx, idx+100000, now();
+        replace into named_smooth (name) select smoothed from named_uniq where pk >= idx and pk < (idx+100000);
+        set idx = idx + 100000;
+    end while;
+
+end $$
+
+delimiter ;
+
+call SetUniqIntoSmoothed();
+
+update named_smooth cross join (select @pk:=0) as init set named_smooth.pk=@pk:=@pk+1;
+
+alter table named_uniq add index (smoothed);
+
+alter table named_smooth add primary key (pk);
+
+EOF
+
+echo ""
+echo "setting smooth_pk back in uniq table..."
+date
+
+echo "select pk, name from named_smooth;" | \
+    mysql $u --skip-column-names ca_sos_$db | \
+    awk 'BEGIN{FS="\t"}{print "update named_uniq set smooth_pk = "$1" where smoothed = '\''"$2"'\'';"}' | \
+    mysql $u ca_sos_$db
+
+date
+
+cat - <<EOF | mysql $u -vvv ca_sos_$db
+
+alter table named_uniq drop column smoothed;
+
+alter table named_uniq add index (smooth_pk);
+
+EOF
+

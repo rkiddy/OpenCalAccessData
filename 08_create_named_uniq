@@ -15,119 +15,108 @@ else
     u="-u root --password=root "
 fi
 
-if [ -d /tmp/named ]; then
-    /bin/rm -rf /tmp/named
-fi
+cat - <<EOF | mysql $u -vvv --local-infile ca_sos_$db 2>/dev/null
 
-mkdir /tmp/named
-cd /tmp/named
+drop table if exists named_uniq;
 
-echo ""
-echo "set up the data for the named_uniq table"
-echo ""
-
-echo "select naml, namf, namt, nams from named;" | mysql $u --skip-column-names ca_sos_$db 2>dev.null > n1.txt
-
-sort < n1.txt | sort | awk '{print NR"\t"$0}' > named_uniq
-
-cat <<EOF | mysql $u -vvv --local-infile ca_sos_$db 2>/dev/null
-
-create table `named_uniq` (
-  `pk` int(11) DEFAULT NULL,
-  `naml` varchar(200) DEFAULT NULL,
-  `namf` varchar(45) DEFAULT NULL,
-  `namt` varchar(10) DEFAULT NULL,
-  `nams` varchar(10) DEFAULT NULL
+create table named_uniq (
+  pk int(11) DEFAULT NULL,
+  naml varchar(200) DEFAULT NULL,
+  namf varchar(45) DEFAULT NULL,
+  namt varchar(10) DEFAULT NULL,
+  nams varchar(10) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
-load data local infile '/tmp/named/named_uniq' into table named_uniq;
-EOF
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) < 'A';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'A';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'B';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'C';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'D';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'E';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'F';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'G';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'H';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'I';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'J';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'K';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'L';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'M';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'N';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'O';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'P';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'Q';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'R';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'S';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'T';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'U';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'V';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'W';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'X';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'Y';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'Z';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) > 'Z' and substr(naml,1,1) < 'a';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'a';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'b';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'c';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'd';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'e';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'f';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'g';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'h';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'i';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'j';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'k';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'l';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'm';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'n';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'o';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'p';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'q';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'r';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 's';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 't';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'u';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'v';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'w';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'x';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'y';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) = 'z';
+insert into named_uniq (naml, namf, nams, namt) select distinct naml, namf, nams, namt from named where substr(naml,1,1) > 'z';
 
-/bin/rm n1.txt named_uniq
+update named_uniq cross join (select @pk:=0) as init set named_uniq.pk=@pk:=@pk+1;
 
-echo ""
-echo "recreate the named table with the uniq_pk value"
-echo "
+alter table named_uniq add primary key (pk);
 
-echo "select naml,namf,namt,nams,pk from named_uniq;" | \
-    mysql $u --skip-column-names ca_sos_$db 2>/dev/null > n1.txt
+alter table named add index (naml, namf, namt, nams);
 
-echo "select naml,namf,namt,nams,table_name,table_pk,name_type from named;" | \
-    mysql $u --skip-column-names ca_sos_20200615 2>/dev/null > n2.txt
+alter table named_uniq add index (naml, namf, namt, nams);
 
-cat n1.txt n2.txt | sort > n3.txt
+drop procedure if exists SetNamedUniqPkInfoNamed;
 
-awk 'BEGIN{FS="\t"}{if (NF == 4) fk=$4;
-           if (NF == 7) print $5"\t"$6"\t"$7"\t"$1"\t"$2"\t"$3"\t"$4"\t"fk}' n3.txt > n4.txt
+delimiter $$
 
-split --lines=10000 --suffix-length=4 n4.txt n4_
+create procedure SetNamedUniqPkInfoNamed()
+begin
+    
+    declare max int;
+    declare idx int default 0;
 
-cat <<EOF | mysql $u -vvv ca_sos_$db 2>/dev/null
+    select max(table_pk) into max from named;
 
-rename table named to named_bak;
-create table `named` (
-  `table_name` varchar(40) NOT NULL,
-  `table_pk` int(11) NOT NULL,
-  `name_type` varchar(6) NOT NULL,
-  `naml` varchar(200) DEFAULT NULL,
-  `namf` varchar(45) DEFAULT NULL,
-  `namt` varchar(10) DEFAULT NULL,
-  `nams` varchar(10) DEFAULT NULL,
-  `names_pk` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+    while idx <= max do
+        select idx, idx+100000, now();
+        update named n1, named_uniq n2 set n1.uniq_pk = n2.pk where n2.pk >= idx and n2.pk < (idx+100000)
+            and n1.naml = n2.naml and n1.namf = n2.namf and n1.nams = n2.nams and n1.namt = n2.namt;
+        set idx = idx + 100000;
+    end while;
 
-EOF
+end $$
 
-/bin/ls -1 n4_* | \
-    awk '{print "cp "$0" named";
-          print "echo \"load data local infile '\''/tmp/named/named'\'' into table named;\" | \\";
-          print "mysql '$u' --local-infile ca_sos_'$db'"}' | /bin/sh 2>/dev/null
+delimiter ;
 
+call SetNamedUniqPkInfoNamed();
 
-# /bin/rm -rf /tmp/named
+drop procedure SetNamedUniqPkInfoNamed;
 
-cat <<EOF | mysql $u -vvv ca_sos_$db
-  alter table named_uniq add column smooth_pk int;
-  alter table named_uniq add column smoothed varchar(299);
-  create table named_smooth (pk int, name varchar(299), uniq_count int, named_count int, linked_to_pk int);
-  alter table named_smooth add unique (name);
-EOF
-
-echo "creating smoothed strings..."
-date
-
-echo "select pk,concat(namf,' ',naml,' ',namt,' ',nams) from named_uniq;" | \
-    mysql $u --skip-column-names ca_sos_$db | \
-    tr '[A-Z]' '[a-z]' | \
-    sed 's/[\.\,'\'']//g' | \
-    sed 's/ $//g' | \
-    awk 'BEGIN{FS="\t"}{print $2"\t"$1}' | \
-    sed 's/^ *//' | \
-    sed 's/  */ /g' | \
-    awk 'BEGIN{FS="\t"}{print "update named_uniq set smoothed = '\''"$1"'\'' where pk = "$2";"}' | \
-    mysql $u ca_sos_$db
-
-date
-
-cat <<EOF | mysql $u -vvv ca_sos_$db
-  replace into named_smooth (name) select smoothed from named_uniq;
-  update named_smooth cross join (select @pk:=0) as init set named_smooth.pk=@pk:=@pk+1;
-  alter table named_uniq add index (smoothed);
-  alter table named_smooth add primary key (pk);
-EOF
-
-echo "setting smooth_pk back in uniq table..."
-date
-
-echo "select pk, name from named_smooth;" | \
-    mysql $u --skip-column-names ca_sos_$db | \
-    awk 'BEGIN{FS="\t"}{print "update named_uniq set smooth_pk = "$1" where smoothed = '\''"$2"'\'';"}' | \
-    mysql $u ca_sos_$db
-
-date
-
-cat <<EOF | mysql $u -vvv ca_sos_$db
-    alter table named_uniq drop column smoothed;
-    alter table named_uniq add index (smooth_pk);
 EOF
 
