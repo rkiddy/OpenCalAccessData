@@ -66,4 +66,30 @@ $no2 = "2>/dev/null";
 #    return 0;
 #}
 
+sub readTableCols {
+
+    open T, "scripts/tableCols.txt";
+    while (<T>) {
+        chomp;
+        $line = $_;
+
+        if ($line ne "" && $line !~ / /) {
+            $tName = $line;
+            $idx = 0;
+        } else {
+            if ($line ne "") {
+                @parts = split ' ', $line;
+                $tablesFound{$tName} = 1;
+                $columns{$tName}[$idx] = shift @parts;
+                $colTypes{$tName}[$idx] = join ' ', @parts;
+
+                # print "columns{".$tName."}[".$idx."] = \"".$columns{$tName}[$idx]."\"\n";
+                # print "colTypes{".$tName."}[".$idx."] = \"".$colTypes{$tName}[$idx]."\"\n";
+
+                $idx++;
+            }
+        }
+    }
+}
+
 1;

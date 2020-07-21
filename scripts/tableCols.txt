@@ -704,7 +704,6 @@ filer_filings
 pk int primary key
 filer_id varchar(11)
 filing_id int
-high_amend_id int
 period_id int
 form_id varchar(7)
 filing_sequence int
