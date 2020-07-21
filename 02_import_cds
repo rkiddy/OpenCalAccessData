@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-$usage1 = "\nusage: ./01_import -date <YYYYMMDD> ( -all | <files> )\n\n";
+$usage1 = "\nusage: ./02_import_cds -date <YYYYMMDD> [ --do-create | --no-create | --do-data-fill | --no-data-fill | --no-data-fix | --do-data-fix ] ( -all | <files> )\n\n";
 $usage2 = "    File names should be all in UPPER case.\n\n";
 $usage3 = "    eg, % ./02_import_cds -date 20200615 FILER_FILINGS_CD.TSV_FIXED\n\n";
 
@@ -11,7 +11,7 @@ sub tableNameFromFile {
     $t = pop @p;
     @p = split '\.', $t;
     local $table = lc($p[0]);
-    if ($verbose > 0) { print "tableNameFromFile: \"".$_."\" -> \"".$table."\"\n"; }
+    if ($verbose > 0) { print "\ntableNameFromFile: \"".$_."\" -> \"".$table."\"\n"; }
     return $table;
 }
 
@@ -24,12 +24,19 @@ my @files = ();
 
 $verbose = 0;
 
+$doCreate = 1;
+$doDataFill = 1;
+$doDataFix = 1;
+
 for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
+
     $arg = $ARGV[$idx];
 
     if ($arg eq "-all") { $allFiles = 1; }
     if ($arg eq "-none") { $noFiles = 1; }
-    if ($arg eq "--create-only") { $createOnly = 1; }
+    if ($arg eq "--no-create") { $noCreate = 1; undef($doCreate); }
+    if ($arg eq "--no-data-fill") { $noDateFill = 1; undef($doDataFill); }
+    if ($arg eq "--no-data-fix") { $noDataFix = 1; undef($doDataFix); }
     if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
     if ($arg =~ /\.TSV_FIXED$/) { push @files, $arg; }
     if ($arg eq "-v") { $verbose = 1; }
@@ -65,6 +72,8 @@ if ( ! defined($allFiles) && scalar(@files) == 0 && $noFiles != 1) {
     print "\n";
 }
 
+&readTableCols();
+
 $databaseExists = "no";
 $cmd = "echo \"show databases;\" | ".$my;
 @dbs = `$cmd`;
@@ -73,163 +82,222 @@ foreach (@dbs) {
     if ($_ eq $dbName) { $databaseExists = "yes"; }
 }
 
-if ($databaseExists eq "no") {
+if ($doCreate == 1) {
 
-    $cmd = "create database ".option("dbName")."_".$importDate." character set utf8mb4 collate utf8mb4_bin;\n";
+    print "\nDataCreate:\n";
 
-    open M, "| ".$myNo;
+    if ($databaseExists eq "no") {
 
-    if ($verbose > 0) { print "cmd: ".$cmd."\n"; }
+        $cmd = "create database ".option("dbName")."_".$importDate." character set utf8mb4 collate utf8mb4_bin;\n";
 
-    print M $cmd;
+        open M, "| ".$myNo;
 
-    close M;
+        if ($verbose > 0) { print "cmd: ".$cmd."\n"; }
 
-    if ($verbose > 0) { print "Created database with name: ".option("dbName")."_".$importDate."\n\n"; }
-}
+        print M $cmd;
 
-open M, "| ".$myV;
+        close M;
 
-print M "SET GLOBAL local_infile = 'ON';\n";
-
-foreach (@files) {
-
-     $file = $_;
-
-     # Given "TEXT_MEMO_CD.TSV" in the data directory, this will now be "text_memo_cd".
-     #
-     $table = &tableNameFromFile($file);
-
-     if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
-
-     print "testing for file: \"".$file."\"\n";
-
-     if ( ! -f $file ) {
-         print "\nERROR: Something wrong? Given a file that does not exist. Aborting.\n\n";
-         exit(1);
-     }
-
-     print M "-- file: ".$file."\n";
-
-     print M "-- table: ".$table."\n";
-
-     $cmd = option("head")." -1 ".$file;
-     print "cmd: ".$cmd."\n";
-     $topLine = `$cmd`;
-     chomp($topLine);
-
-     @cols = split '\s', $topLine;
-
-     $sql = "create table ".$table." (";
-     $sql .= "pk int primary key,";
-     foreach (@cols) { $sql .= lc($_)." blob,"; }
-     $sql =~ s/,$//;
-     $sql .= ");";
-     print M "drop table if exists ".$table.";\n";
-     print M $sql."\n\n";
-}
-
-close M;
-
-if ($createOnly > 0) { exit(0); }
-
-open M, "| ".$myV;
-
-print M "SET GLOBAL local_infile = 'ON';\n";
-
-foreach (@files) {
-
-    $file = $_;
-
-    if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
-
-    # Given "TEXT_MEMO_CD.TSV" in the data directory, this will now be "text_memo_cd".
-    #
-    $table = &tableNameFromFile($file);
-
-    if (defined($verbose)) { print "table: \"".$table."\"\n"; }
-
-    $pk = 1;
-
-    if (defined($verbose)) { print "open SQL_IN, ".$file."\n"; }
-    open SQL_IN, $file;
-
-    if (defined($verbose)) { print "open SQL_OUT, >".option("tmpDir")."/".$table."\n"; }
-    open SQL_OUT, ">".option("tmpDir")."/".$table;
-
-    $first = <SQL_IN>;
-    print SQL_OUT "pk\t".$first;
-
-    while (<SQL_IN>) {
-        $line = $_;
-        $line =~ s/ *\t/\t/g;
-
-        # This will handle the date columns.
-        #
-        while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}) 12:00:00 AM\t/) {
-            $pre = $`;
-            $post = $';
-            $month = $1;
-            $day = $2;
-            $year = $3;
-            while (length($month) < 2) { $month = "0".$month; }
-            while (length($day) < 2) { $day = "0".$day; }
-            $line = $pre."\t".$year."-".$month."-".$day."\t".$post;
-        }
-
-        # This will handle the effect_dt column in the filername table, which does not have " 12:00:00 AM" after the date.
-        #
-        while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})\t/) {
-            $pre = $`;
-            $post = $';
-            $month = $1;
-            $day = $2;
-            $year = $3;
-            while (length($month) < 2) { $month = "0".$month; }
-            while (length($day) < 2) { $day = "0".$day; }
-            $line = $pre."\t".$year."-".$month."-".$day."\t".$post;
-        }
-
-        # This will handle the datetime column in FILER_TO_FILER_TYPE.TSV, whyever it must be diferent.
-        #
-        while ($line =~ /\t([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2}) ([AP]M)\t/) {
-            $pre = $`;
-            $post = $';
-            $month = $1;
-            $day = $2;
-            $year = $3;
-            $hour = $4;
-            $minute = $5;
-            $second = $6;
-            $ampm = $7;
-            while (length($month) < 2) { $month = "0".$month; }
-            while (length($day) < 2) { $day = "0".$day; }
-            while (length($hour) < 2) { $hour = "0".$hour; }
-            while (length($minute) < 2) { $minute = "0".$minute; }
-            while (length($second) < 2) { $second = "0".$second; }
-            $line = $pre."\t".$year."-".$month."-".$day." ".$hour.":".$minute.":".$second." ".$ampm."\t".$post;
-        }
-
-        print SQL_OUT $pk."\t".$line;
-        $pk++;
+        if ($verbose > 0) { print "Created database with name: ".option("dbName")."_".$importDate."\n\n"; }
+    } else {
+        if ($verbose > 0) { print "NOT creating database with name: ".option("dbName")."_".$importDate."\n\n"; }
     }
-
-    close SQL_IN;
-    close SQL_OUT;
 
     open M, "| ".$myV;
 
-    print M "set max_error_count=65535;\n";
+    print M "SET GLOBAL local_infile = 'ON';\n";
 
-    $sql = "load data local infile '".option("tmpDir")."/".$table."' into table ".$table." ".
-           "fields terminated by '\\t' lines terminated by '\\r\\n' ignore 1 lines;\n";
+    foreach (sort @files) {
 
-    print M $sql;
-    print M "show warnings;\n";
+         $file = $_;
+
+         # Given "TEXT_MEMO_CD.TSV_FIXED" in the data directory, this will now be "text_memo_cd".
+         #
+         $table = &tableNameFromFile($file);
+
+         $shortTable = $table;
+         $shortTable =~ s/_cd//;
+
+         print "readTableCols: table: \"".$table."\" -> ".$tablesFound{$shortTable}."\n";
+
+         if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
+
+         print "testing for file: \"".$file."\"\n";
+
+         if ( ! -f $file ) {
+             print "\nERROR: Something wrong? Given a file that does not exist. Aborting.\n\n";
+             exit(1);
+         } else {
+             if ($verbose) { print "file exista: \"".$file."\"\n"; }
+         }
+
+         print M "-- file: ".$file."\n";
+
+         print M "-- table: ".$table."\n";
+
+         $cols = "";
+         $idx = 0;
+         while (defined($columns{$shortTable}[$idx])) {
+             $column = $columns{$shortTable}[$idx];
+             $type = $colTypes{$shortTable}[$idx];
+             $nextType = $type;
+
+             if ($column ne "pk") {
+
+                  if ($type eq "date") { $nextType = "varchar(31)"; }
+                  if ($type eq "int") { $nextType = "varchar(31)"; }
+                  if ($type eq "int NOT NULL") { $nextType = "varchar(31)"; }
+                  if ($type eq "datetime") { $nextType = "varchar(31)"; }
+                  if ($type eq "decimal(12,2)") { $nextType = "varchar(31)"; }
+
+                  $cols .= "\n    ".$column." ".$nextType.",";
+             }
+             $idx++;
+         }
+         $cols =~ s/,$//;
+
+         print M "drop table if exists ".$table.";\n";
+         print M "create table ".$table." (\n".$cols."\n);\n";
+    }
 
     close M;
+}
 
-    unlink(option("tmpDir")."/".$table);
+if ($doDataFill == 1) {
+
+    print "\nDataFill:\n";
+
+    foreach (sort @files) {
+
+        $file = $_;
+
+        if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
+
+        # Given "TEXT_MEMO_CD.TSV" in the data directory, this will now be "text_memo_cd".
+        #
+        $table = &tableNameFromFile($file);
+
+        $shortTable = $table;
+        $shortTable =~ s/_cd//;
+
+        print "readTableCols: table: \"".$table."\" -> ".$tablesFound{$shortTable}."\n";
+
+        open M, "| ".$myV;
+
+        print M "set max_error_count=65535;\n";
+
+        $sql = "load data local infile '".option("projectDir")."/".$file."' into table ".$table." ".
+               "fields terminated by '\\t' lines terminated by '\\r\\n' ignore 1 lines;\n";
+
+        print M $sql;
+        print M "show warnings;\n";
+
+        close M;
+    }
+}
+
+if ($doDataFix == 1) {
+
+    print "\nDataFix:\n";
+
+    foreach (sort @files) {
+
+        $file = $_;
+
+        if ($file !~ /^data_/) { $file = "data_".$importDate."/CalAccess/DATA/".$file; }
+
+        # Given "TEXT_MEMO_CD.TSV" in the data directory, this will now be "text_memo_cd".
+        #
+        $table = &tableNameFromFile($file);
+
+        $shortTable = $table;
+        $shortTable =~ s/_cd//;
+
+        if ($verbose) { print "readTableCols: table: \"".$table."\" -> ".$tablesFound{$shortTable}."\n"; }
+
+        print "-- table: ".$table."\n\n";
+
+        open M, "| ".$myV;
+
+        #print M "alter table ".$table." add column pk int first;\n\n";
+
+        #print M "update ".$table." cross join (select \@pk:=0) as init set ".$table.".pk=\@pk:=\@pk+1;\n\n";
+
+        $idx = 0;
+        while (defined($columns{$shortTable}[$idx])) {
+
+            $column = $columns{$shortTable}[$idx];
+            $type = $colTypes{$shortTable}[$idx];
+
+            print " -- column: ".$column.", type: ".$type."\n";
+
+            if ($type eq "int") {
+                #print M "update ".$table." set ".$column." = NULL where ".$column." = '';\n\n";
+            }
+
+            if ($type eq "decimal(12,2)") {
+                #print M "update ".$table." set ".$column." = NULL where ".$column." = '';\n\n";
+            }
+
+            if ($type eq "datetime") {
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",5,4),'-','0',substr(".$column.",1,1),'-','0',substr(".$column.",3,1),' ',substr(".$column.",-12))\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",5,4),'-','0',substr(".$column.",1,1),'-','0',substr(".$column.",3,1),' ',substr(".$column.",-11))\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",6,4),'-',substr(".$column.",1,2),'-','0',substr(".$column.",4,1),' ',substr(".$column.",-12))\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",6,4),'-',substr(".$column.",1,2),'-','0',substr(".$column.",4,1),' ',substr(".$column.",-11))\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",6,4),'-','0',substr(".$column.",1,1),'-',substr(".$column.",3,2),' ',substr(".$column.",-12))\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",6,4),'-','0',substr(".$column.",1,1),'-',substr(".$column.",3,2),' ',substr(".$column.",-11))\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",7,4),'-',substr(".$column.",1,2),'-',substr(".$column.",4,2),' ',substr(".$column.",-12))\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",7,4),'-',substr(".$column.",1,2),'-',substr(".$column.",4,2),' ',substr(".$column.",-11))\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+            }
+
+            if ($type eq "date") {
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",5,4),'-','0',substr(".$column.",1,1),'-','0',substr(".$column.",3,1))\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",6,4),'-',substr(".$column.",1,2),'-','0',substr(".$column.",4,1))\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",6,4),'-','0',substr(".$column.",1,1),'-',substr(".$column.",3,2))\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+
+                print M "update ".$table."\n";
+                print M "set ".$column." = concat(substr(".$column.",7,4),'-',substr(".$column.",1,2),'-',substr(".$column.",4,2))\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+            }
+
+            $idx++;
+        }
+
+        close M;
+    }
 }
 
 print "\nDone!\n";
