@@ -92,11 +92,6 @@ foreach (sort keys %tables) {
         if ($colTypes{$table}[$idx] eq "datetime") {
             print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
         }
-        if ($columns{$table}[$idx] ne "high_amend_id") {
-            if ($colTypes{$table}[$idx] eq "int") {
-                print M "update ".$table."_cd set ".$columns{$table}[$idx]." = '0' where ".$columns{$table}[$idx]." = '';\n";
-            }
-        }
         if ($columns{$table}[$idx] eq "filing_id") {
             print M "alter table ".$table." add index(filing_id);\n";
         }
@@ -148,18 +143,6 @@ foreach (sort keys %tables) {
             print M "show warnings;\n";
         }
     }
-
-    close M;
-
-
-    open M, "| ".&option("mysql").$u." -vvv --local-infile ".&option("dbName")."_all";
-
-    print M "load data infile '/tmp/import_logs.txt' into table import_logs lines terminated by '___XYZZY___';\n";
-
-    print M "insert into imports (log_pk, db_name, table_name, when_imported) values ";
-    print M "    ((select max(pk) from import_logs), '".&option("dbName")."_".$importDate."', '".$table."', now());\n";
-
-    print M "quit\n";
 
     close M;
 }
