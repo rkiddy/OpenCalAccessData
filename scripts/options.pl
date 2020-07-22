@@ -30,27 +30,12 @@ sub set_up_options {
 
     $date = $_[0];
 
-    if (&option("host") eq "mac") {
-
-        $my = option("mysql")." --local-infile ".&option("dbName")."_".$date;
-        $myV = option("mysql")." -vvv --local-infile ".&option("dbName")."_".$date;
-        $myVF = option("mysql")." -vvv --local-infile --force ".&option("dbName")."_".$date;
-        $myQ = option("mysql")." --skip-column-names --local-infile ".&option("dbName")."_".$date;
-        $myQF = option("mysql")." --skip-column-names --local-infile --force ".&option("dbName")."_".$date;
-        $myNo = option("mysql");
-    }
-
-    if (&option("host") eq "aws") {
-
-        $u = " -u ".option("dbUser")." --password=".option("dbPwd");
-
-        $my = option("mysql").$u." --local-infile ".&option("dbName")."_".$date;
-        $myV = option("mysql").$u." -vvv --local-infile ".&option("dbName")."_".$date;
-        $myVF = option("mysql").$u." -vvv --local-infile --force ".&option("dbName")."_".$date;
-        $myQ = option("mysql").$u." --skip-column-names --local-infile ".&option("dbName")."_".$date;
-        $myQF = option("mysql").$u." --skip-column-names --local-infile --force ".&option("dbName")."_".$date;
-        $myNo = option("mysql").$u;
-    }
+    $my = option("mysql")." --local-infile ".&option("dbName")."_".$date;
+    $myV = option("mysql")." -vvv --local-infile ".&option("dbName")."_".$date;
+    $myVF = option("mysql")." -vvv --local-infile --force ".&option("dbName")."_".$date;
+    $myQ = option("mysql")." --skip-column-names --local-infile ".&option("dbName")."_".$date;
+    $myQF = option("mysql")." --skip-column-names --local-infile --force ".&option("dbName")."_".$date;
+    $myNo = option("mysql");
 }
 
 $no2 = "2>/dev/null";
