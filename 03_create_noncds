@@ -84,29 +84,6 @@ foreach (sort keys %tables) {
 
     if (defined($verbose)) { print M "show warnings;\n"; }
 
-    $idx = 0;
-    while (defined($columns{$table}[$idx])) {
-        if ($colTypes{$table}[$idx] eq "date") {
-            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(10));\n";
-        }
-        if ($colTypes{$table}[$idx] eq "datetime") {
-            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
-        }
-        if ($columns{$table}[$idx] eq "filing_id") {
-            print M "alter table ".$table." add index(filing_id);\n";
-        }
-        if ($columns{$table}[$idx] eq "amend_id") {
-            print M "alter table ".$table." add index(amend_id);\n";
-        }
-        if ($columns{$table}[$idx] eq "filer_id") {
-            print M "alter table ".$table." add index(filer_id);\n";
-        }
-        if ($columns{$table}[$idx] =~ /_naml$/) {
-            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
-        }
-        $idx++;
-    }
-
     undef @cols;
 
     $idx = 0;
@@ -142,6 +119,29 @@ foreach (sort keys %tables) {
 
             print M "show warnings;\n";
         }
+    }
+
+    $idx = 0;
+    while (defined($columns{$table}[$idx])) {
+        if ($colTypes{$table}[$idx] eq "date") {
+            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(10));\n";
+        }
+        if ($colTypes{$table}[$idx] eq "datetime") {
+            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
+        }
+        if ($columns{$table}[$idx] eq "filing_id") {
+            print M "alter table ".$table." add index(filing_id);\n";
+        }
+        if ($columns{$table}[$idx] eq "amend_id") {
+            print M "alter table ".$table." add index(amend_id);\n";
+        }
+        if ($columns{$table}[$idx] eq "filer_id") {
+            print M "alter table ".$table." add index(filer_id);\n";
+        }
+        if ($columns{$table}[$idx] =~ /_naml$/) {
+            print M "alter table ".$table." add index(".$columns{$table}[$idx]."(20));\n";
+        }
+        $idx++;
     }
 
     close M;
