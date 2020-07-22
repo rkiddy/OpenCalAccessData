@@ -219,9 +219,9 @@ if ($doDataFix == 1) {
 
         open M, "| ".$myV;
 
-        print M "alter table ".$table." add column pk int first;\n\n";
-
-        print M "update ".$table." cross join (select \@pk:=0) as init set ".$table.".pk=\@pk:=\@pk+1;\n\n";
+        print M "alter table ".$table." add column pk int first;\n";
+        print M "update ".$table." cross join (select \@pk:=0) as init set ".$table.".pk=\@pk:=\@pk+1;\n";
+        print M "alter table ".$table." add primary key (pk);\n";
 
         $idx = 0;
         while (defined($columns{$shortTable}[$idx])) {
@@ -232,18 +232,18 @@ if ($doDataFix == 1) {
             print " -- column: ".$column.", type: ".$type."\n";
 
             if ($type eq "int") {
-                print M "update ".$table." set ".$column." = NULL where ".$column." = '';\n\n";
+                print M "update ".$table." set ".$column." = NULL where ".$column." = '';\n";
             }
 
             if ($type eq "decimal(12,2)") {
-                print M "update ".$table." set ".$column." = NULL where ".$column." = '';\n\n";
+                print M "update ".$table." set ".$column." = NULL where ".$column." = '';\n";
             }
 
             if ($type eq "datetime") {
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",5,4),'-','0',substr(".$column.",1,1),'-','0',substr(".$column.",3,1),' ',substr(".$column.",-12))\n";
-                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",5,4),'-','0',substr(".$column.",1,1),'-','0',substr(".$column.",3,1),' ',substr(".$column.",-11))\n";
@@ -251,7 +251,7 @@ if ($doDataFix == 1) {
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",6,4),'-',substr(".$column.",1,2),'-','0',substr(".$column.",4,1),' ',substr(".$column.",-12))\n";
-                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",6,4),'-',substr(".$column.",1,2),'-','0',substr(".$column.",4,1),' ',substr(".$column.",-11))\n";
@@ -259,38 +259,38 @@ if ($doDataFix == 1) {
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",6,4),'-','0',substr(".$column.",1,1),'-',substr(".$column.",3,2),' ',substr(".$column.",-12))\n";
-                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",6,4),'-','0',substr(".$column.",1,1),'-',substr(".$column.",3,2),' ',substr(".$column.",-11))\n";
-                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",7,4),'-',substr(".$column.",1,2),'-',substr(".$column.",4,2),' ',substr(".$column.",-12))\n";
-                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [01][0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",7,4),'-',substr(".$column.",1,2),'-',substr(".$column.",4,2),' ',substr(".$column.",-11))\n";
-                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] [0-9]:[0-9][0-9]:[0-9][0-9] [AP]M\$';\n";
             }
 
             if ($type eq "date") {
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",5,4),'-','0',substr(".$column.",1,1),'-','0',substr(".$column.",3,1))\n";
-                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",6,4),'-',substr(".$column.",1,2),'-','0',substr(".$column.",4,1))\n";
-                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",6,4),'-','0',substr(".$column.",1,1),'-',substr(".$column.",3,2))\n";
-                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+                print M "where ".$column." rlike '^[0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n";
 
                 print M "update ".$table."\n";
                 print M "set ".$column." = concat(substr(".$column.",7,4),'-',substr(".$column.",1,2),'-',substr(".$column.",4,2))\n";
-                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n\n";
+                print M "where ".$column." rlike '^[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9] 12:00:00 AM\$';\n";
             }
 
             $idx++;
