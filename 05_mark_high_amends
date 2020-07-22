@@ -1,70 +1,164 @@
-#!/usr/bin/perl
+#!/bin/sh
 
-require "scripts/options.pl";
+if [ "$1" != "-date" ] || [ "$2" = "" ]; then
+    echo ""
+    echo "usage: ./08_create_named_uniq -date <YYYYMMDD>"
+    echo ""
+    exit
+fi
 
-for ($idx = 0; $idx < scalar(@ARGV); $idx++) {
-    $arg = $ARGV[$idx];
+cat - <<EOF | mysql --skip-column-names ca_sos_$2 2>/dev/null > /tmp/ca_sos_$2_amends.txt
 
-    if ($arg eq "-date") { $importDate = $ARGV[$idx+1]; $idx++; next; }
-    if ($arg !~ /^\-/) { $tables{$_} = 1; }
-}
+select filing_id, amend_id from cvr_campaign_disclosure;
+select filing_id, amend_id from cvr_e530;
+select filing_id, amend_id from cvr_lobby_disclosure;
+select filing_id, amend_id from cvr_registration;
+select filing_id, amend_id from cvr_so;
+select filing_id, amend_id from cvr2_campaign_disclosure;
+select filing_id, amend_id from cvr2_lobby_disclosure;
+select filing_id, amend_id from cvr2_registration;
+select filing_id, amend_id from cvr2_so;
+select filing_id, amend_id from cvr3_verification_info;
+select filing_id, amend_id from debt;
+select filing_id, amend_id from expn;
+select filing_id, amend_id from f495p2;
+select filing_id, amend_id from f501_502;
+select filing_id, amend_id from f690p2;
+select filing_id, amend_id from hdr;
+select filing_id, amend_id from latt;
+select filing_id, amend_id from lccm;
+select filing_id, amend_id from lemp;
+select filing_id, amend_id from lexp;
+select filing_id, amend_id from loan;
+select filing_id, amend_id from lobby_amendments;
+select filing_id, amend_id from loth;
+select filing_id, amend_id from lpay;
+select filing_id, amend_id from rcpt;
+select filing_id, amend_id from s401;
+select filing_id, amend_id from s496;
+select filing_id, amend_id from s497;
+select filing_id, amend_id from s498;
+select filing_id, amend_id from smry;
+select filing_id, amend_id from splt;
+select filing_id, amend_id from text_memo;
 
-if ( ! defined($importDate)) {
-    print "\nusage: ./05_mark_high_amends -date <YYYYMMDD> [ <tables> ]\n\n";
-    exit(0);
-}
+EOF
 
-&set_up_options($importDate);
+cat - <<EOF | mysql -vvv ca_sos_$2 2>/dev/null
 
-if ( ! defined(%tables)) {
-    open T, "scripts/tableCols.txt";
-    while (<T>) {
-        chomp;
-        $line = $_;
-        if ($line ne "" && $line !~ / /) { $tName = $_; }
-        if ($line =~ /^amend_id/) { $tables{$tName} = 1; }
-    }
-}
+create table cvr_campaign_disclosure_lo like cvr_campaign_disclosure;
+create table cvr_e530_lo like cvr_e530;
+create table cvr_lobby_disclosure_lo like cvr_lobby_disclosure;
+create table cvr_registration_lo like cvr_registration;
+create table cvr_so_lo like cvr_so;
+create table cvr2_campaign_disclosure_lo like cvr2_campaign_disclosure;
+create table cvr2_lobby_disclosure_lo like cvr2_lobby_disclosure;
+create table cvr2_registration_lo like cvr2_registration;
+create table cvr2_so_lo like cvr2_so;
+create table cvr3_verification_info_lo like cvr3_verification_info;
+create table debt_lo like debt;
+create table expn_lo like expn;
+create table f495p2_lo like f495p2;
+create table f501_502_lo like f501_502;
+create table f690p2_lo like f690p2;
+create table hdr_lo like hdr;
+create table latt_lo like latt;
+create table lccm_lo like lccm;
+create table lemp_lo like lemp;
+create table lexp_lo like lexp;
+create table loan_lo like loan;
+create table lobby_amendments_lo like lobby_amendments;
+create table loth_lo like loth;
+create table lpay_lo like lpay;
+create table rcpt_lo like rcpt;
+create table s401_lo like s401;
+create table s496_lo like s496;
+create table s497_lo like s497;
+create table s498_lo like s498;
+create table smry_lo like smry;
+create table splt_lo like splt;
+create table text_memo_lo like text_memo;
 
-delete $tables{"filings"};
+EOF
 
-print "%tables:\n";
-foreach (sort keys %tables) { print "    ".$_."\n"; }
+ls -l /tmp/ca_sos_$2_amends.txt
 
-$cmd = "echo \"desc filer_filings;\" | ".$myQ;
-@cols = `$cmd`;
+sort -rn < /tmp/ca_sos_$2_amends.txt | \
+    awk 'BEGIN{last="";FS="\t"}{if (last != $1) print $0; last=$1}' > /tmp/ca_sos_$2_amends_hi.txt
 
-foreach (@cols) {
-    @p = split '\t', $_;
-    if ($p[0] eq "high_amend_id") { $foundHighAmend = 1; }
-}
+ls -l /tmp/ca_sos_$2_amends_hi.txt
 
-if ( ! defined($foundHighAmend)) {
-    print "\nNo high_amend_id column. Altering table...";
-    $cmd = "echo \"alter table filer_filings add column high_amend_id int after filing_id;\" | ".$myV;
-    print `$cmd`;
-}
+/bin/rm -f /tmp/ca_sos_$2_amends.txt
 
-open M, "| ".$myV;
+echo "to be deleting..."
 
-foreach (sort keys %tables) {
-    $table = $_;
+awk 'BEGIN{FS="\t"}
+     {if ($2 > 0) {
+      print "insert into cvr_campaign_disclosure_lo select * from cvr_campaign_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr_campaign_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr_e530_lo select * from cvr_e530 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr_e530 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr_lobby_disclosure_lo select * from cvr_lobby_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr_lobby_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr_registration_lo select * from cvr_registration where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr_registration where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr_so_lo select * from cvr_so where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr_so where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr2_campaign_disclosure_lo select * from cvr2_campaign_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr2_campaign_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr2_lobby_disclosure_lo select * from cvr2_lobby_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr2_lobby_disclosure where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr2_registration_lo select * from cvr2_registration where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr2_registration where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr2_so_lo select * from cvr2_so where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr2_so where filing_id = "$1" and amend_id < "$2";";
+      print "insert into cvr3_verification_info_lo select * from cvr3_verification_info where filing_id = "$1" and amend_id < "$2";";
+      print "delete from cvr3_verification_info where filing_id = "$1" and amend_id < "$2";";
+      print "insert into debt_lo select * from debt where filing_id = "$1" and amend_id < "$2";";
+      print "delete from debt where filing_id = "$1" and amend_id < "$2";";
+      print "insert into expn_lo select * from expn where filing_id = "$1" and amend_id < "$2";";
+      print "delete from expn where filing_id = "$1" and amend_id < "$2";";
+      print "insert into f495p2_lo select * from f495p2 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from f495p2 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into f501_502_lo select * from f501_502 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from f501_502 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into f690p2_lo select * from f690p2 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from f690p2 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into hdr_lo select * from hdr where filing_id = "$1" and amend_id < "$2";";
+      print "delete from hdr where filing_id = "$1" and amend_id < "$2";";
+      print "insert into latt_lo select * from latt where filing_id = "$1" and amend_id < "$2";";
+      print "delete from latt where filing_id = "$1" and amend_id < "$2";";
+      print "insert into lccm_lo select * from lccm where filing_id = "$1" and amend_id < "$2";";
+      print "delete from lccm where filing_id = "$1" and amend_id < "$2";";
+      print "insert into lemp_lo select * from lemp where filing_id = "$1" and amend_id < "$2";";
+      print "delete from lemp where filing_id = "$1" and amend_id < "$2";";
+      print "insert into lexp_lo select * from lexp where filing_id = "$1" and amend_id < "$2";";
+      print "delete from lexp where filing_id = "$1" and amend_id < "$2";";
+      print "insert into loan_lo select * from loan where filing_id = "$1" and amend_id < "$2";";
+      print "delete from loan where filing_id = "$1" and amend_id < "$2";";
+      print "insert into lobby_amendments_lo select * from lobby_amendments where filing_id = "$1" and amend_id < "$2";";
+      print "delete from lobby_amendments where filing_id = "$1" and amend_id < "$2";";
+      print "insert into loth_lo select * from loth where filing_id = "$1" and amend_id < "$2";";
+      print "delete from loth where filing_id = "$1" and amend_id < "$2";";
+      print "insert into lpay_lo select * from lpay where filing_id = "$1" and amend_id < "$2";";
+      print "delete from lpay where filing_id = "$1" and amend_id < "$2";";
+      print "insert into rcpt_lo select * from rcpt where filing_id = "$1" and amend_id < "$2";";
+      print "delete from rcpt where filing_id = "$1" and amend_id < "$2";";
+      print "insert into s401_lo select * from s401 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from s401 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into s496_lo select * from s496 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from s496 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into s497_lo select * from s497 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from s497 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into s498_lo select * from s498 where filing_id = "$1" and amend_id < "$2";";
+      print "delete from s498 where filing_id = "$1" and amend_id < "$2";";
+      print "insert into smry_lo select * from smry where filing_id = "$1" and amend_id < "$2";";
+      print "delete from smry where filing_id = "$1" and amend_id < "$2";";
+      print "insert into splt_lo select * from splt where filing_id = "$1" and amend_id < "$2";";
+      print "delete from splt where filing_id = "$1" and amend_id < "$2";";
+      print "insert into text_memo_lo select * from text_memo where filing_id = "$1" and amend_id < "$2";";
+      print "delete from text_memo where filing_id = "$1" and amend_id < "$2";"}}' /tmp/ca_sos_$2_amends_hi.txt | \
+mysql ca_sos_$2 2>/dev/null
 
-    print "\n".$table."...";
+exit
 
-    print M "update filer_filings f1, (select filing_id, max(amend_id) as max from ".$table." group by filing_id) as a1 ".
-            "set f1.high_amend_id = a1.max where f1.filing_id = a1.filing_id and (f1.high_amend_id is NULL or f1.high_amend_id < a1.max);\n";
-
-    print "\n";
-}
-
-print M "delete from filer_filings where high_amend_id != filing_sequence;\n";
-
-# Theoretically, I could go to all of the tables and remove all of the rows where the filing_id/amend_id do not match the highest.
-# This would save some space....
-
-close M;
-
-print "\n\n";
-
-exit(0);
