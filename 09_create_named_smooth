@@ -9,40 +9,53 @@ fi
 
 db=$2
 
-if [ `uname` = "Darwin" ]; then
-    u=""
-else
-    u="-u root --password=root "
+echo "desc named_uniq;" | mysql --skip-column-names ca_sos_$db | tr '\t' ' ' | grep 'smooth_pk ' > /tmp/uniq_$$
+
+if [ ! -s /tmp/uniq_$$ ]; then
+    echo "alter table named_uniq add column smooth_pk int;" | mysql -vvv ca_sos_$db
 fi
 
-cat <<EOF | mysql $u -vvv ca_sos_$db
+echo "desc named_uniq;" | mysql --skip-column-names ca_sos_$db | tr '\t' ' ' | grep 'smoothed ' > /tmp/uniq_$$
 
-  alter table named_uniq add column smooth_pk int;
-
-  alter table named_uniq add column smoothed varchar(299);
-
-  create table named_smooth (pk int, name varchar(299), uniq_count int, named_count int, linked_to_pk int);
-
-  alter table named_smooth add unique (name);
-
-EOF
+if [ ! -s /tmp/uniq_$$ ]; then
+    echo "alter table named_uniq add column smoothed varchar(299);" | mysql -vvv ca_sos_$db
+fi
 
 echo ""
-echo "creating smoothed strings..."
+echo "creating smoothed strings in uniq table..."
 date
 
-echo "select pk,concat(namf,' ',naml,' ',namt,' ',nams) from named_uniq;" | \
-    mysql $u --skip-column-names ca_sos_$db | \
-    tr '[A-Z]' '[a-z]' | \
-    sed 's/[\.\,'\'']//g' | \
-    sed 's/ $//g' | \
-    awk 'BEGIN{FS="\t"}{print $2"\t"$1}' | \
-    sed 's/^ *//' | \
-    sed 's/  */ /g' | \
-    awk 'BEGIN{FS="\t"}{print "update named_uniq set smoothed = '\''"$1"'\'' where pk = "$2";"}' | \
-    mysql $u ca_sos_$db
+count=1
+
+while [ $count -gt 0 ];
+do
+
+    echo "select pk,concat(namf,' ',naml,' ',namt,' ',nams) from named_uniq where smoothed is NULL limit 10000;" | \
+        mysql --skip-column-names ca_sos_$db | \
+        tr '[A-Z]' '[a-z]' | \
+        sed 's/[\.\,'\'']//g' | \
+        sed 's/ $//g' | \
+        awk 'BEGIN{FS="\t"}{print $2"\t"$1}' | \
+        sed 's/^ *//' | \
+        sed 's/  */ /g' | \
+        awk 'BEGIN{FS="\t"}{print "update named_uniq set smoothed = '\''"$1"'\'' where pk = "$2";"}' | \
+        mysql ca_sos_$db
+
+    count=`echo "select count(0) from named_uniq where smoothed is not NULL;" | mysql --skip-column-names ca_sos_$db`
+
+done
 
 date
+
+echo ""
+echo "putting the smoothed strings into the smooth table..."
+echo ""
+
+echo "show tables;" | mysql --skip-column-names ca_sos_20200715 | tr '\t' ' ' | grep 'named_smooth' > /tmp/uniq_$$
+
+if [ ! -s /tmp/uniq_$$ ]; then
+    ( echo "create table named_smooth (pk int, name varchar(299), uniq_count int, named_count int, linked_to_pk int);" ;
+      echo "alter table named_smooth add unique (name);" ) | mysql -vvv ca_sos_$db
 
 cat - <<EOF | mysql $u -vvv ca_sos_$db
 
@@ -97,3 +110,4 @@ alter table named_uniq add index (smooth_pk);
 
 EOF
 
+exit
