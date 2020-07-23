@@ -41,7 +41,7 @@ do
         awk 'BEGIN{FS="\t"}{print "update named_uniq set smoothed = '\''"$1"'\'' where pk = "$2";"}' | \
         mysql ca_sos_$db
 
-    count=`echo "select count(0) from named_uniq where smoothed is not NULL;" | mysql --skip-column-names ca_sos_$db`
+    count=`echo "select count(0) from named_uniq where smoothed is NULL;" | mysql --skip-column-names ca_sos_$db`
 
 done
 
