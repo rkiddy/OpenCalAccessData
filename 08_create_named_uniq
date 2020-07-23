@@ -9,13 +9,7 @@ fi
 
 db=$2
 
-if [ `uname` = "Darwin" ]; then
-    u=""
-else
-    u="-u root --password=root "
-fi
-
-cat - <<EOF | mysql $u -vvv --local-infile ca_sos_$db 2>/dev/null
+cat - <<EOF | mysql -vvv --local-infile ca_sos_$db 2>/dev/null
 
 drop table if exists named_uniq;
 
