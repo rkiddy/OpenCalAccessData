@@ -51,7 +51,7 @@ echo ""
 echo "putting the smoothed strings into the smooth table..."
 echo ""
 
-echo "show tables;" | mysql --skip-column-names ca_sos_20200715 | tr '\t' ' ' | grep 'named_smooth' > /tmp/uniq_$$
+echo "show tables;" | mysql --skip-column-names ca_sos_$db | tr '\t' ' ' | grep 'named_smooth' > /tmp/uniq_$$
 
 if [ ! -s /tmp/uniq_$$ ]; then
     ( echo "create table named_smooth (pk int, name varchar(299), uniq_count int, named_count int, linked_to_pk int);" ;
